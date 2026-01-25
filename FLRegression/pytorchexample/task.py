@@ -1,5 +1,3 @@
-"""pytorchexample: A Flower / PyTorch app for Personal Finance Prediction."""
-
 import os
 import torch
 import torch.nn as nn
@@ -79,8 +77,7 @@ def _load_and_preprocess_data():
     
     if _data_cache is not None:
         return _data_cache, _preprocessors
-    
-    # Load CSV
+        
     data_path = _get_data_path()
     df = pd.read_csv(data_path)
     
@@ -89,22 +86,22 @@ def _load_and_preprocess_data():
     scaler = StandardScaler()
     target_scaler = StandardScaler()
     
-    # Encode categorical columns
+    # categorical columns
     df_processed = df.copy()
     for col in CATEGORICAL_COLUMNS:
         le = LabelEncoder()
         df_processed[col] = le.fit_transform(df[col])
         label_encoders[col] = le
     
-    # Get feature columns (all numerical + encoded categorical, excluding target)
+    
     feature_cols = NUMERICAL_COLUMNS + CATEGORICAL_COLUMNS
     feature_cols = [c for c in feature_cols if c != TARGET_COLUMN]
     
-    # Prepare features and target
+    
     X = df_processed[feature_cols].values.astype(np.float32)
     y = df_processed[TARGET_COLUMN].values.astype(np.float32).reshape(-1, 1)
     
-    # Scale features
+    
     X_scaled = scaler.fit_transform(X)
     y_scaled = target_scaler.fit_transform(y)
     
@@ -114,7 +111,6 @@ def _load_and_preprocess_data():
     incomes = df["Income"].values
     
     # Create combined partition key: Occupation + City_Tier + Income_Bracket
-    # This creates ~12+ unique groups for more heterogeneity
     income_brackets = pd.qcut(incomes, q=3, labels=["Low", "Medium", "High"]).astype(str)
     combined_keys = np.array([f"{o}_{c}_{i}" for o, c, i in zip(occupations, city_tiers, income_brackets)])
     
@@ -148,8 +144,7 @@ def get_input_dim():
 
 
 def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Load partition of Personal Finance data with EXTREME non-IID partitioning.
-    
+    """  
     Non-IID Strategy:
     1. Primary split by Occupation + City_Tier + Income_Bracket (36 possible groups)
     2. Label skew: Some clients only see high/low disposable income samples
@@ -163,13 +158,11 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     unique_keys = data_cache["unique_keys"]
     incomes = data_cache["incomes"]
     
-    # =========================================================================
     # EXTREME NON-IID: Multi-dimensional partitioning
-    # =========================================================================
     
-    np.random.seed(42 + partition_id)  # Reproducible but different per client
+    np.random.seed(42 + partition_id)
     
-    # Strategy 1: Assign clients to specific combined keys (Occupation+City+Income)
+    
     # Each client primarily gets data from 1-2 specific demographic groups
     num_keys = len(unique_keys)
     
@@ -184,10 +177,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     primary_indices = np.where(combined_keys == primary_key)[0]
     secondary_indices = np.where(combined_keys == secondary_key)[0]
     
-    # =========================================================================
     # Strategy 2: Income-based label skew
-    # Odd partition_ids get high-income bias, even get low-income bias
-    # =========================================================================
     income_percentile = np.percentile(incomes, [25, 75])
     
     if partition_id % 2 == 0:
@@ -199,19 +189,16 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
         income_mask_primary = incomes[primary_indices] > income_percentile[0]
         income_mask_secondary = incomes[secondary_indices] > income_percentile[0]
     
-    # Apply income filter (keep at least 50% of data even if filter is too strict)
+    # Apply income filter
     if income_mask_primary.sum() > len(primary_indices) * 0.3:
         primary_indices = primary_indices[income_mask_primary]
     if income_mask_secondary.sum() > len(secondary_indices) * 0.3:
         secondary_indices = secondary_indices[income_mask_secondary]
     
-    # =========================================================================
     # Strategy 3: Quantity skew - uneven data distribution
-    # =========================================================================
     # Some clients get more data, some get less
     quantity_factor = 0.5 + (partition_id % 5) * 0.2  # Ranges from 0.5 to 1.3
     
-    # Sample from primary (70%) and secondary (30%) with quantity skew
     n_primary = min(len(primary_indices), int(800 * quantity_factor * 0.7))
     n_secondary = min(len(secondary_indices), int(800 * quantity_factor * 0.3))
     
@@ -239,12 +226,12 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     X_partition = X[partition_indices]
     y_partition = y[partition_indices]
     
-    # Split into train/test (80/20)
+    #(80/20)
     X_train, X_test, y_train, y_test = train_test_split(
         X_partition, y_partition, test_size=0.2, random_state=42
     )
     
-    # Create PyTorch datasets
+    #PyTorch datasets
     train_dataset = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
         torch.tensor(y_train, dtype=torch.float32)
@@ -285,8 +272,7 @@ def get_target_scaler():
 
 
 def compute_model_divergence(local_params, global_params):
-    """Compute L2 divergence between local and global model parameters.
-
+    """
     Returns:
         divergence: L2 norm of (local - global) parameters.
     """
@@ -304,16 +290,11 @@ def compute_adaptive_mu(
     mu_min: float = 0.001,
     mu_max: float = 1.0,
 ) -> float:
-    """Compute adaptive proximal coefficient based on client behavior.
-
-    Adaptive strategy:
-    - Higher historical divergence compared to global average → higher μ
-    - More local epochs → higher μ (prevent excessive drift)
-    - Clients that diverge more need tighter regularization
+    """adaptive proximal coefficient
 
     Args:
         base_mu: Base proximal coefficient from config.
-        historical_divergence: This client's historical divergence (from previous rounds).
+        historical_divergence: This client's historical divergence.
         global_avg_divergence: Average divergence across all clients.
         local_epochs: Number of local training epochs.
         mu_min: Minimum allowed μ value.
@@ -322,21 +303,18 @@ def compute_adaptive_mu(
     Returns:
         Adaptive μ value clamped between mu_min and mu_max.
     """
-    # Factor 1: Divergence-based scaling
-    # If client's historical divergence is higher than global average, increase μ
+    #Divergence-based scaling
     if global_avg_divergence > 0 and historical_divergence > 0:
-        # Scale μ based on how much this client diverges vs average
         divergence_ratio = historical_divergence / (global_avg_divergence + 1e-8)
-        # Smooth the ratio to prevent extreme values
-        divergence_factor = 1.0 + 0.5 * (divergence_ratio - 1.0)  # Dampened scaling
-        divergence_factor = max(0.5, min(2.0, divergence_factor))  # Clamp to [0.5, 2.0]
+        divergence_factor = 1.0 + 0.5 * (divergence_ratio - 1.0)
+        divergence_factor = max(0.5, min(2.0, divergence_factor))
     else:
         divergence_factor = 1.0
 
-    # Factor 2: Local epochs scaling (more epochs = higher μ to prevent drift)
-    epoch_factor = 1.0 + 0.1 * (local_epochs - 1)  # Scale up for >1 epoch
+    #Local epochs scaling more epochs = higher μ to prevent drift
+    epoch_factor = 1.0 + 0.1 * (local_epochs - 1) 
 
-    # Combine factors
+    # Combine factors and calculate adaptive mu
     adaptive_mu = base_mu * divergence_factor * epoch_factor
 
     # Clamp to valid range
@@ -344,14 +322,11 @@ def compute_adaptive_mu(
 
 
 def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_config=None):
-    """Train the model on the training set using FedProx with optional adaptive μ.
-
-    Args:
+    """Args:
         net: The neural network model.
         trainloader: DataLoader for training data.
         epochs: Number of local epochs.
         lr: Learning rate.
-        device: Device to train on (CPU/GPU).
         proximal_mu: Proximal term coefficient (0.0 = FedAvg, >0 = FedProx).
         adaptive_mu_config: Optional dict with adaptive μ settings:
             - enabled: bool, whether to use adaptive μ
@@ -364,15 +339,15 @@ def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_con
         dict with:
             - train_loss: Average training loss.
             - divergence: Post-training divergence from global model.
-            - effective_mu: The μ value actually used (may be adaptive).
+            - effective_mu: The μ value actually used.
     """
-    net.to(device)  # move model to GPU if available
+    net.to(device)
     net.train()
 
-    # Store global model parameters for proximal term (before training)
+    # Store global model parameters for proximal term before training
     global_params = [p.clone().detach().to(device) for p in net.parameters()]
 
-    # Compute adaptive μ if enabled (using historical data, not pre-training divergence)
+    
     effective_mu = proximal_mu
     if adaptive_mu_config and adaptive_mu_config.get("enabled", False):
         effective_mu = compute_adaptive_mu(
