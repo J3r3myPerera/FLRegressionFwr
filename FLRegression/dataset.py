@@ -46,6 +46,19 @@ def reset_data_cache():
 def _get_data_path():
     """Get the path to the CSV data file."""
     # CSV file is located in the data directory at the workspace root
+    # Support both absolute path (local) and relative path (CI/CD)
+    import os
+    data_path = os.getenv("DATA_PATH")
+    if data_path:
+        return Path(data_path)
+    
+    # Try relative path first (for CI/CD)
+    current_dir = Path(__file__).parent
+    relative_path = current_dir.parent.parent / "data" / "indianPersonalFinanceAndSpendingHabits.csv"
+    if relative_path.exists():
+        return relative_path
+    
+    # Fallback to absolute path (for local development)
     return Path("/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv")
 
 

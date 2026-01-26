@@ -113,6 +113,31 @@ After running simulations, the following files are generated:
 - `r2_comparison.png`: R² score progression comparison
 - `mse_comparison.png`: MSE loss progression comparison
 
+## CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline using GitHub Actions:
+
+- **Automated Testing**: Runs on every push and pull request
+- **Code Quality Checks**: Linting with flake8, formatting checks with Black and isort
+- **Simulation Validation**: Quick and full simulation tests
+- **Multi-Python Support**: Tests on Python 3.10 and 3.11
+
+See [.github/workflows/README.md](../.github/workflows/README.md) for detailed CI/CD documentation.
+
+### Running Tests Locally
+
+```bash
+# Install test dependencies
+pip install -r requirements.txt
+pip install pytest pytest-cov flake8
+
+# Run all tests
+pytest tests/ -v
+
+# Run quick CI simulation
+./scripts/run_tests.sh
+```
+
 ## For More Details
 
 See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed documentation on:
