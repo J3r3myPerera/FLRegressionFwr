@@ -10,57 +10,20 @@ Strategies compared:
 3. SmartFedProx: Proximal term (μ=0.1), hybrid client selection with adaptive μ
 """
 
-import os
-import sys
 import torch
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from pathlib import Path
 from collections import defaultdict
 
-# Add project to path
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
-
-from pytorchexample.task import (
-    Net, get_input_dim, load_data, load_centralized_dataset, 
-    train, test, _load_and_preprocess_data, reset_data_cache
+# Import from module and dataset
+from module import (
+    Net, get_input_dim, load_data, load_centralized_dataset,
+    train, test, _load_and_preprocess_data, reset_data_cache,
+    NUM_ROUNDS, NUM_CLIENTS, FRACTION_FIT, LOCAL_EPOCHS,
+    LEARNING_RATE, BATCH_SIZE, DEVICE, STRATEGIES
 )
-
-# ============================================================================
-# Configuration
-# ============================================================================
-NUM_ROUNDS = 20
-NUM_CLIENTS = 10
-FRACTION_FIT = 0.5
-LOCAL_EPOCHS = 3
-LEARNING_RATE = 0.001
-BATCH_SIZE = 64
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-# Strategy configurations
-STRATEGIES = {
-    "FedAvg": {
-        "proximal_mu": 0.0,
-        "adaptive_mu_enabled": False,
-        "selection_strategy": "random",
-        "description": "Baseline FedAvg (μ=0)"
-    },
-    "FedProx": {
-        "proximal_mu": 0.1,
-        "adaptive_mu_enabled": False,
-        "selection_strategy": "random",
-        "description": "FedProx (μ=0.1, random selection)"
-    },
-    "SmartFedProx": {
-        "proximal_mu": 0.1,
-        "adaptive_mu_enabled": True,
-        "selection_strategy": "hybrid",
-        "description": "SmartFedProx (adaptive μ, hybrid selection)"
-    }
-}
 
 
 class SimulatedClient:
