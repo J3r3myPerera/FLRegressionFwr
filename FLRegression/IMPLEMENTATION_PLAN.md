@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project implements a **Federated Learning** system using **FedProx** algorithm with **intelligent client selection** based on divergence metrics. The implementation extends the Flower framework with custom strategies for handling non-IID data distributions common in real-world federated settings.
+This project implements a **Federated Learning** system using **FedProx** algorithm with **intelligent client selection** based on divergence metrics. The implementation uses standalone Python scripts (no Flower framework) to simulate federated learning with custom strategies for handling non-IID data distributions common in real-world federated settings.
 
 ---
 
@@ -10,14 +10,13 @@ This project implements a **Federated Learning** system using **FedProx** algori
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         SERVER (ServerApp)                       │
+│                    SERVER (FederatedSimulator)                   │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │                    SmartFedProx Strategy                     ││
 │  │  ┌──────────────────┐  ┌────────────────┐  ┌──────────────┐ ││
 │  │  │ Client Selection │  │ Model Aggreg.  │  │ Client Stats │ ││
 │  │  │ • Random         │  │ • FedAvg base  │  │ • Divergence │ ││
-│  │  │ • Diversity      │  │ • Proximal μ   │  │ • Loss hist. │ ││
-│  │  │ • Hybrid         │  │                │  │ • Particip.  │ ││
+│  │  │ • Hybrid         │  │ • Proximal μ   │  │ • Loss hist. │ ││
 │  │  └──────────────────┘  └────────────────┘  └──────────────┘ ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
@@ -25,7 +24,7 @@ This project implements a **Federated Learning** system using **FedProx** algori
                               │ Global Model + Config
                               ▼
     ┌─────────────────────────────────────────────────────────────┐
-    │                    CLIENT NODES (ClientApp)                  │
+    │                    CLIENT NODES (SimulatedClient)            │
     │  ┌─────────────┐  ┌─────────────┐       ┌─────────────┐     │
     │  │  Client 1   │  │  Client 2   │  ...  │  Client N   │     │
     │  │ • Partition │  │ • Partition │       │ • Partition │     │
@@ -37,110 +36,85 @@ This project implements a **Federated Learning** system using **FedProx** algori
 
 ---
 
+## Project Structure
+
+```
+FLRegression/
+├── dataset.py              # Dataset loading, preprocessing, and partitioning
+├── module.py               # Model (Net), training/test functions, configuration
+├── client.py               # SimulatedClient class for local training
+├── server.py               # FederatedSimulator class for orchestration
+├── main.py                 # Main entry point for running simulations
+└── run_comparison.py       # Comparison script for all three strategies
+```
+
+---
+
 ## 1. Client Selection Strategies
 
 ### 1.1 Selection Strategy Types
 
-The system supports three client selection strategies defined in `SelectionStrategy`:
+The system supports three client selection strategies:
 
 | Strategy | Description | Best For |
 |----------|-------------|----------|
 | **RANDOM** | Uniform random sampling | Baseline, stable convergence |
-| **DIVERSITY** | Prioritizes high-divergence clients | Non-IID data, faster adaptation |
-| **HYBRID** | Balanced mix of high/low divergence | Best of both worlds |
+| **HYBRID** | Balanced mix of high/middle/low divergence | Best of both worlds (default for SmartFedProx) |
 
 ### 1.2 Implementation Details
 
-#### Location: [pytorchexample/strategy.py](pytorchexample/strategy.py)
-
-#### `SmartFedProx` Class
-
-```python
-class SmartFedProx(FedProx):
-    """FedProx strategy with intelligent client selection."""
-```
+#### Location: [server.py](server.py) - `FederatedSimulator.select_clients()`
 
 **Key Parameters:**
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `selection_strategy` | `"random"` | Which selection algorithm to use |
-| `selection_temperature` | `1.0` | Softmax temperature for probabilistic selection |
-| `hybrid_high_ratio` | `0.5` | Ratio of high-divergence clients in hybrid mode |
-| `cold_start_rounds` | `2` | Random selection rounds before using divergence data |
-| `exploration_rate` | `0.1` | Probability of random selection for exploration |
+| `cold_start_rounds` | `3` | Random selection rounds before using divergence data |
+| `exploration_rate` | `0.15` | Probability of random selection for exploration |
 
 ### 1.3 Selection Algorithm Flow
 
 ```
 ┌─────────────────────────────────────┐
-│         configure_train()           │
+│         select_clients()             │
 │   Called at start of each round     │
 └────────────────┬────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────┐
-│    Cold Start? (round ≤ 2)          │
+│    Cold Start? (round ≤ 3)          │
 │    YES → Random Selection           │
 │    NO  → Continue                   │
 └────────────────┬────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────┐
-│    Exploration? (10% chance)        │
+│    Exploration? (15% chance)         │
 │    YES → Random Selection           │
 │    NO  → Continue                   │
 └────────────────┬────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────┐
-│    Enough History?                  │
-│    NO  → Mix historical + random    │
-│    YES → Apply Strategy             │
-└────────────────┬────────────────────┘
-                 │
-        ┌────────┼────────┐
-        ▼        ▼        ▼
-   ┌────────┐ ┌────────┐ ┌────────┐
-   │DIVERSITY│ │ HYBRID │ │ RANDOM │
-   │High div │ │50/50   │ │Uniform │
-   │priority │ │mix     │ │sample  │
-   └────────┘ └────────┘ └────────┘
+│    Apply Hybrid Strategy             │
+│    • 30% high-divergence clients    │
+│    • 50% middle-divergence clients  │
+│    • 20% low-divergence clients     │
+└─────────────────────────────────────┘
 ```
 
-### 1.4 Diversity Selection (`_select_diversity`)
-
-Prioritizes clients with **highest divergence** from the global model:
-
-1. Sort clients by `latest_divergence` (descending)
-2. Apply **softmax sampling** with temperature scaling
-3. Higher divergence = higher selection probability
-
-**Use Case:** When data is highly non-IID and you want the model to quickly learn from diverse local distributions.
-
-### 1.5 Hybrid Selection (`_select_hybrid`)
+### 1.4 Hybrid Selection
 
 Balances convergence stability with diversity:
 
-1. Split clients into **high-divergence** and **low-divergence** groups (median split)
-2. Select `hybrid_high_ratio` × k clients from high-divergence group
-3. Select remaining from low-divergence group
-4. Fill any gaps with random sampling
+1. Sort clients by smoothed divergence (weighted average: 50% latest + 30% previous + 20% mean of rest)
+2. Select 30% from high-divergence group
+3. Select 50% from middle-divergence group
+4. Select 20% from low-divergence group
+5. Fill any gaps with random sampling
 
 **Use Case:** Production systems where you need both stability and adaptation.
-
-### 1.6 Softmax Sampling (`_softmax_sample`)
-
-Probabilistic selection based on position scores:
-
-```python
-# Temperature controls randomness:
-# - Low (<1):  More deterministic (closer to top-k)
-# - High (>1): More uniform (closer to random)
-scores = [n - i for i in range(n)]  # Position-based
-exp_scores = [exp((s - max_score) / temperature) for s in scores]
-probs = [s / total for s in exp_scores]
-```
 
 ---
 
@@ -155,20 +129,20 @@ $$
 $$
 
 Where:
-- $F_k(w)$ = Local loss function
+- $F_k(w)$ = Local loss function (MSE for regression)
 - $w^t$ = Global model weights (from server)
 - $\mu$ = Proximal coefficient (regularization strength)
 
 ### 2.2 Training with Proximal Term
 
-#### Location: [pytorchexample/task.py](pytorchexample/task.py) - `train()` function
+#### Location: [module.py](module.py) - `train()` function
 
 ```python
 # Store global model before training
-global_params = [p.clone().detach() for p in net.parameters()]
+global_params = [p.clone().detach().to(device) for p in net.parameters()]
 
 # In training loop:
-loss = criterion(net(images), labels)
+loss = criterion(predictions, targets)
 
 # Add proximal term: (μ/2) * ||w - w^t||²
 if effective_mu > 0.0:
@@ -181,6 +155,8 @@ if effective_mu > 0.0:
 ### 2.3 Divergence Computation
 
 Measures how much local model has drifted from global:
+
+#### Location: [module.py](module.py) - `compute_model_divergence()`
 
 ```python
 def compute_model_divergence(local_params, global_params):
@@ -204,17 +180,22 @@ Fixed μ is suboptimal because:
 
 ### 3.2 Adaptive μ Formula
 
-#### Location: [pytorchexample/task.py](pytorchexample/task.py) - `compute_adaptive_mu()`
+#### Location: [module.py](module.py) - `compute_adaptive_mu()`
 
 ```python
 # Factor 1: Divergence ratio
-divergence_ratio = current_divergence / (historical_divergence + ε)
+if global_avg_divergence > 0 and historical_divergence > 0:
+    divergence_ratio = historical_divergence / (global_avg_divergence + 1e-8)
+    divergence_factor = 1.0 + 0.5 * (divergence_ratio - 1.0)  # Dampened scaling
+    divergence_factor = max(0.5, min(2.0, divergence_factor))  # Clamp to [0.5, 2.0]
+else:
+    divergence_factor = 1.0
 
 # Factor 2: Epoch scaling
 epoch_factor = 1.0 + 0.1 * (local_epochs - 1)
 
 # Combine
-adaptive_mu = base_mu * divergence_ratio * epoch_factor
+adaptive_mu = base_mu * divergence_factor * epoch_factor
 
 # Clamp to [mu_min, mu_max]
 return max(mu_min, min(mu_max, adaptive_mu))
@@ -224,143 +205,161 @@ return max(mu_min, min(mu_max, adaptive_mu))
 
 Exponential Moving Average (EMA) maintains client history:
 
+#### Location: [client.py](client.py) - `SimulatedClient.train()`
+
 ```python
-# In client_app.py
+# Update historical divergence with EMA
 alpha = 0.3  # EMA smoothing factor
-new_historical = alpha * current_divergence + (1 - alpha) * old_divergence
-context.state["adaptive_state"] = ConfigRecord({"historical_divergence": new_historical})
+self.historical_divergence = alpha * result["divergence"] + (1 - alpha) * self.historical_divergence
 ```
 
 ---
 
-## 4. Client History Tracking
+## 4. Dataset and Preprocessing
 
-### 4.1 `ClientHistory` Class
+### 4.1 Dataset Location
 
-#### Location: [pytorchexample/strategy.py](pytorchexample/strategy.py)
+The dataset is located at:
+```
+/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv
+```
 
-Tracks per-client metrics across rounds:
+### 4.2 Data Preprocessing
+
+#### Location: [dataset.py](dataset.py) - `_load_and_preprocess_data()`
+
+1. **Load CSV**: Read Indian Personal Finance dataset
+2. **Encode Categorical**: Label encode `Occupation` and `City_Tier`
+3. **Scale Features**: StandardScaler for numerical features
+4. **Scale Target**: StandardScaler for `Disposable_Income`
+5. **Create Partition Keys**: Combine Occupation + City_Tier + Income_Bracket for extreme non-IID
+
+### 4.3 Extreme Non-IID Partitioning
+
+#### Location: [dataset.py](dataset.py) - `load_data()`
+
+**Strategy 1: Multi-dimensional Partitioning**
+- Primary split by Occupation + City_Tier + Income_Bracket (36+ unique groups)
+- Each client primarily gets data from 1-2 specific demographic groups
+- 70% from primary key, 30% from secondary key
+
+**Strategy 2: Income-based Label Skew**
+- Odd partition_ids: High income bias (above 25th percentile)
+- Even partition_ids: Low income bias (below 75th percentile)
+
+**Strategy 3: Quantity Skew**
+- Uneven data distribution: quantity_factor ranges from 0.5 to 1.3
+- Some clients get more data, some get less
+
+---
+
+## 5. Model Architecture
+
+### 5.1 MLP for Regression
+
+#### Location: [module.py](module.py) - `Net` class
+
+```
+Input: 26 features (after preprocessing)
+     │
+     ▼
+Linear(26→128) + BatchNorm + ReLU + Dropout(0.3)
+     │
+     ▼
+Linear(128→64) + BatchNorm + ReLU + Dropout(0.2)
+     │
+     ▼
+Linear(64→32) + BatchNorm + ReLU
+     │
+     ▼
+Linear(32→1) → Disposable Income (regression output)
+```
+
+**Loss Function:** MSE (Mean Squared Error)  
+**Optimizer:** Adam with learning rate 0.001  
+**Metrics:** R² Score (coefficient of determination), MSE Loss
+
+---
+
+## 6. Configuration Reference
+
+### 6.1 Configuration Constants
+
+#### Location: [module.py](module.py)
 
 ```python
-class ClientHistory:
-    divergence: list[float]      # Per-round divergence values
-    train_loss: list[float]      # Per-round training losses
-    effective_mu: list[float]    # Per-round μ values used
-    num_examples: int            # Client's dataset size
-    participation_count: int     # Times selected for training
-```
+# Simulation Configuration
+NUM_ROUNDS = 20
+NUM_CLIENTS = 10
+FRACTION_FIT = 0.5
+LOCAL_EPOCHS = 3
+LEARNING_RATE = 0.001
+BATCH_SIZE = 64
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-### 4.2 Metrics Collected
-
-| Metric | Source | Purpose |
-|--------|--------|---------|
-| `divergence` | `task.train()` | Client selection decisions |
-| `train_loss` | `task.train()` | Convergence monitoring |
-| `effective_mu` | `task.train()` | Adaptive μ tuning |
-| `num-examples` | DataLoader | Weighted aggregation |
-
-### 4.3 Aggregation Hook
-
-```python
-def aggregate_train(self, server_round, replies):
-    # Update history from each reply
-    for reply in replies:
-        node_id = reply.metadata.src_node_id
-        metrics = reply.content.get("metrics", {})
-        
-        history = self.client_history[node_id]
-        history.divergence.append(metrics["divergence"])
-        history.train_loss.append(metrics["train_loss"])
-        # ... etc
-        
-    # Call parent FedProx aggregation
-    return super().aggregate_train(server_round, replies)
+# Strategy configurations
+STRATEGIES = {
+    "FedAvg": {
+        "proximal_mu": 0.0,
+        "adaptive_mu_enabled": False,
+        "selection_strategy": "random",
+        "description": "Baseline FedAvg (μ=0)"
+    },
+    "FedProx": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": False,
+        "selection_strategy": "random",
+        "description": "FedProx (μ=0.1, random selection)"
+    },
+    "SmartFedProx": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "hybrid",
+        "description": "SmartFedProx (adaptive μ, hybrid selection)"
+    }
+}
 ```
 
 ---
 
-## 5. Configuration Reference
-
-### 5.1 pyproject.toml Settings
-
-```toml
-[tool.flwr.app.config]
-# Training settings
-num-server-rounds = 3
-fraction-fit = 0.5          # 50% of clients per round
-fraction-evaluate = 0.5
-local-epochs = 1
-learning-rate = 0.1
-batch-size = 32
-
-# FedProx core
-proximal-mu = 0.1           # Base μ (0 = FedAvg)
-
-# Adaptive μ
-adaptive-mu-enabled = true
-mu-min = 0.001
-mu-max = 1.0
-
-# Smart client selection
-selection-strategy = "hybrid"    # random | diversity | hybrid
-selection-temperature = 1.0
-hybrid-high-ratio = 0.5
-cold-start-rounds = 2
-exploration-rate = 0.1
-```
-
-### 5.2 GPU Configuration
-
-```toml
-[tool.flwr.federations.local-simulation-gpu]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 1.0  # Full GPU per client
-```
-
----
-
-## 6. Data Flow Diagram
+## 7. Data Flow Diagram
 
 ```
 Round N Start
      │
      ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ SERVER: SmartFedProx.configure_train()                          │
-│   1. Get available nodes from Grid                              │
-│   2. Apply selection strategy → Select K clients                │
-│   3. Create Messages with:                                      │
-│      • Global model arrays                                      │
-│      • Config (lr, proximal_mu, adaptive settings)              │
+│ SERVER: FederatedSimulator.run()                                 │
+│   1. Select clients (based on strategy)                          │
+│   2. Send global model state_dict + config to selected clients   │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ CLIENTS: train() in client_app.py                               │
+│ CLIENTS: SimulatedClient.train()                                 │
 │   1. Load global model weights                                  │
-│   2. Load local data partition                                  │
+│   2. Load local data partition (extreme non-IID)                │
 │   3. Compute adaptive μ (if enabled)                            │
 │   4. Train with FedProx proximal term                           │
 │   5. Compute post-training divergence                           │
-│   6. Return: updated weights + metrics                          │
+│   6. Update historical divergence (EMA)                         │
+│   7. Return: updated weights + metrics                          │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ SERVER: SmartFedProx.aggregate_train()                          │
-│   1. Extract metrics from replies                               │
-│   2. Update ClientHistory for each client                       │
-│   3. Aggregate model weights (FedAvg)                           │
-│   4. Return aggregated model + metrics                          │
+│ SERVER: FederatedSimulator.aggregate()                           │
+│   1. Weighted average aggregation (FedAvg)                      │
+│   2. Update global model                                         │
+│   3. Track client statistics                                     │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ SERVER: Evaluation Phase                                         │
-│   1. Select subset for evaluation                               │
-│   2. Run global_evaluate() on test set                          │
-│   3. Log accuracy & loss                                        │
+│ SERVER: FederatedSimulator.evaluate_global()                    │
+│   1. Load centralized test set                                   │
+│   2. Evaluate global model                                       │
+│   3. Compute R² score and MSE loss                               │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -369,52 +368,28 @@ Round N Start
 
 ---
 
-## 7. Model Architecture
-
-### CNN for CIFAR-10
-
-#### Location: [pytorchexample/task.py](pytorchexample/task.py) - `Net` class
-
-```
-Input: 3×32×32 (RGB CIFAR-10 image)
-     │
-     ▼
-Conv2d(3→6, 5×5) + ReLU + MaxPool(2×2)  →  6×14×14
-     │
-     ▼
-Conv2d(6→16, 5×5) + ReLU + MaxPool(2×2) →  16×5×5
-     │
-     ▼
-Flatten → 400
-     │
-     ▼
-Linear(400→120) + ReLU
-     │
-     ▼
-Linear(120→84) + ReLU
-     │
-     ▼
-Linear(84→10) → 10 class logits
-```
-
----
-
 ## 8. Running the System
 
-### Basic Run (CPU)
+### Basic Run
+
 ```bash
-flwr run .
+cd FLRegression
+python main.py
 ```
 
-### GPU Run
+### Run Comparison Script
+
 ```bash
-flwr run . local-simulation-gpu
+python run_comparison.py
 ```
 
-### Custom Configuration
-```bash
-flwr run . --run-config "selection-strategy=diversity proximal-mu=0.5 num-server-rounds=10"
-```
+This runs multiple trials for statistical significance and generates comprehensive comparison plots.
+
+### Output Files
+
+- `comparison_results.png`: Comprehensive 6-panel comparison plot
+- `r2_comparison.png`: R² score progression comparison
+- `mse_comparison.png`: MSE loss progression comparison
 
 ---
 
@@ -423,31 +398,47 @@ flwr run . --run-config "selection-strategy=diversity proximal-mu=0.5 num-server
 | Decision | Rationale |
 |----------|-----------|
 | **Cold start with random** | Need baseline metrics before divergence-based selection |
-| **10% exploration rate** | Prevents strategy from getting stuck in local optima |
-| **Softmax sampling** | Probabilistic selection maintains diversity |
+| **15% exploration rate** | Prevents strategy from getting stuck in local optima |
+| **Hybrid selection (30/50/20)** | Best balance of stability and adaptation |
 | **EMA for historical divergence** | Smooths noise, adapts to changing client behavior |
-| **Hybrid as default** | Best balance of stability and adaptation |
 | **Proximal term in loss** | Prevents catastrophic client drift in non-IID settings |
+| **Extreme non-IID partitioning** | Realistic heterogeneous data distribution |
+| **Adaptive μ per client** | Handles varying client behavior and data distributions |
 
 ---
 
-## 10. Future Improvements
-
-1. **Gradient-based selection**: Use gradient similarity instead of weight divergence
-2. **Fairness constraints**: Ensure all clients participate over time
-3. **Dynamic temperature**: Anneal softmax temperature over rounds
-4. **Client clustering**: Group similar clients for more efficient selection
-5. **Bandwidth-aware selection**: Factor in communication costs
-6. **Asynchronous training**: Handle stragglers without blocking rounds
-
----
-
-## 11. File Summary
+## 10. File Summary
 
 | File | Purpose |
 |------|---------|
-| [strategy.py](pytorchexample/strategy.py) | SmartFedProx with client selection logic |
-| [server_app.py](pytorchexample/server_app.py) | Server entry point, config loading |
-| [client_app.py](pytorchexample/client_app.py) | Client training/evaluation logic |
-| [task.py](pytorchexample/task.py) | Model, data loading, train/test functions |
-| [pyproject.toml](pyproject.toml) | Dependencies and configuration |
+| [dataset.py](dataset.py) | Dataset loading, preprocessing, and extreme non-IID partitioning |
+| [module.py](module.py) | Model definition (Net), training/test functions, configuration |
+| [client.py](client.py) | SimulatedClient class for local training and evaluation |
+| [server.py](server.py) | FederatedSimulator class for orchestration and aggregation |
+| [main.py](main.py) | Main entry point for running simulations |
+| [run_comparison.py](run_comparison.py) | Comparison script for all three strategies with multiple trials |
+
+---
+
+## 11. Metrics Tracked
+
+| Metric | Description | Location |
+|--------|-------------|----------|
+| **R² Score** | Coefficient of determination for regression | `module.test()` |
+| **MSE Loss** | Mean Squared Error | `module.test()` |
+| **Training Loss** | Average training loss per round | `module.train()` |
+| **Model Divergence** | L2 norm of parameter differences | `module.compute_model_divergence()` |
+| **Effective μ** | Actual proximal coefficient used (may be adaptive) | `module.train()` |
+| **Historical Divergence** | EMA-smoothed divergence history per client | `client.SimulatedClient` |
+
+---
+
+## 12. Future Improvements
+
+1. **Gradient-based selection**: Use gradient similarity instead of weight divergence
+2. **Fairness constraints**: Ensure all clients participate over time
+3. **Dynamic temperature**: Anneal selection randomness over rounds
+4. **Client clustering**: Group similar clients for more efficient selection
+5. **Bandwidth-aware selection**: Factor in communication costs
+6. **Asynchronous training**: Handle stragglers without blocking rounds
+7. **Federated evaluation**: Evaluate on client test sets instead of centralized test set

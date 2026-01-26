@@ -1,82 +1,122 @@
----
-tags: [quickstart, vision, fds]
-dataset: [CIFAR-10]
-framework: [torch, torchvision]
----
+# Federated Learning for Personal Finance Prediction
 
-# Federated Learning with PyTorch and Flower (Quickstart Example)
+This project implements a **Federated Learning** system for predicting disposable income using the Indian Personal Finance dataset. It compares three federated learning strategies: **FedAvg**, **FedProx**, and **SmartFedProx** with adaptive μ and hybrid client selection.
 
-This introductory example to Flower uses PyTorch, but deep knowledge of PyTorch is not necessarily required to run the example. However, it will help you understand how to adapt Flower to your use case. Running this example in itself is quite easy. This example uses [Flower Datasets](https://flower.ai/docs/datasets/) to download, partition and preprocess the CIFAR-10 dataset.
+## Project Structure
 
-## Set up the project
-
-### Fetch the app
-
-Install Flower:
-
-```shell
-pip install flwr
+```
+FLRegression/
+├── dataset.py              # Dataset loading and preprocessing
+├── module.py               # Model definition, training functions, and configuration
+├── client.py               # SimulatedClient class for local training
+├── server.py               # FederatedSimulator class for orchestration
+├── main.py                 # Main entry point for running simulations
+├── run_comparison.py       # Comparison script for all three strategies
+├── README.md               # This file
+└── IMPLEMENTATION_PLAN.md  # Detailed implementation documentation
 ```
 
-Fetch the app:
+## Dataset
 
-```shell
-flwr new @flwrlabs/quickstart-pytorch
+The dataset (`indianPersonalFinanceAndSpendingHabits.csv`) is located at:
+```
+/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv
 ```
 
-This will create a new directory called `quickstart-pytorch` with the following structure:
+**Target Variable:** `Disposable_Income` (regression task)
 
-```shell
-quickstart-pytorch
-├── pytorchexample
-│   ├── __init__.py
-│   ├── client_app.py   # Defines your ClientApp
-│   ├── server_app.py   # Defines your ServerApp
-│   └── task.py         # Defines your model, training and data loading
-├── pyproject.toml      # Project metadata like dependencies and configs
-└── README.md
-```
+**Features:** Income, Age, Dependents, Rent, Loan_Repayment, Insurance, various spending categories, and potential savings.
 
-### Install dependencies and project
+**Non-IID Partitioning:** The data is partitioned using extreme non-IID strategy:
+- Primary split by Occupation + City_Tier + Income_Bracket
+- Label skew: Some clients only see high/low disposable income samples
+- Quantity skew: Uneven data distribution across clients
 
-Install the dependencies defined in `pyproject.toml` as well as the `pytorchexample` package.
+## Installation
+
+### Prerequisites
+
+- Python 3.10+
+- PyTorch
+- NumPy, Pandas, scikit-learn
+- Matplotlib
+
+### Install Dependencies
 
 ```bash
-pip install -e .
+pip install torch pandas scikit-learn numpy matplotlib
 ```
 
-## Run the project
+## Running the Project
 
-You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
+### Run Main Simulation
 
-### Run with the Simulation Engine
-
-> [!TIP]
-> This example might run faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in `pyproject.toml`. If you want to try running the example with GPU right away, use the `local-simulation-gpu` federation as shown below. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more.
+Run the main federated learning simulation comparing all three strategies:
 
 ```bash
-# Run with the default federation (CPU only)
-flwr run .
+cd FLRegression
+python main.py
 ```
 
-You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
+This will:
+- Run simulations for FedAvg, FedProx, and SmartFedProx
+- Generate comparison plots (R² score, MSE loss, training loss, divergence, effective μ)
+- Save results to `comparison_results.png`, `r2_comparison.png`, and `mse_comparison.png`
+
+### Run Comparison Script
+
+Run the detailed comparison script with multiple trials:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 learning-rate=0.05"
+python run_comparison.py
 ```
 
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 5x`ClientApp` will run in parallel in the available GPU. You can tweak the degree of parallelism by adjusting the settings of this federation in the `pyproject.toml`.
+This runs multiple trials for statistical significance and generates comprehensive comparison plots.
 
-```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
-```
+## Strategies Compared
 
-> [!TIP]
-> For a more detailed walk-through check our [quickstart PyTorch tutorial](https://flower.ai/docs/framework/tutorial-quickstart-pytorch.html)
+1. **FedAvg**: Baseline federated averaging (μ=0, random client selection)
+2. **FedProx**: FedProx with fixed μ=0.1 and random client selection
+3. **SmartFedProx**: FedProx with adaptive μ and hybrid client selection
 
-### Run with the Deployment Engine
+## Configuration
 
-Follow this [how-to guide](https://flower.ai/docs/framework/how-to-run-flower-with-deployment-engine.html) to run the same app in this example but with Flower's Deployment Engine. After that, you might be intersted in setting up [secure TLS-enabled communications](https://flower.ai/docs/framework/how-to-enable-tls-connections.html) and [SuperNode authentication](https://flower.ai/docs/framework/how-to-authenticate-supernodes.html) in your federation.
+Key configuration parameters are defined in `module.py`:
 
-If you are already familiar with how the Deployment Engine works, you may want to learn how to run it using Docker. Check out the [Flower with Docker](https://flower.ai/docs/framework/docker/index.html) documentation.
+- `NUM_ROUNDS = 20`: Number of federated learning rounds
+- `NUM_CLIENTS = 10`: Number of clients
+- `FRACTION_FIT = 0.5`: Fraction of clients selected per round
+- `LOCAL_EPOCHS = 3`: Local training epochs per client
+- `LEARNING_RATE = 0.001`: Learning rate for Adam optimizer
+- `BATCH_SIZE = 64`: Batch size for training
+
+## Model Architecture
+
+The model is a Multi-Layer Perceptron (MLP) for regression:
+- Input: 26 features (after preprocessing)
+- Hidden layers: 128 → 64 → 32 neurons
+- Output: 1 neuron (disposable income prediction)
+- Activation: ReLU with BatchNorm and Dropout
+
+## Key Features
+
+- **Extreme Non-IID Data Partitioning**: Realistic heterogeneous data distribution
+- **Adaptive Proximal Coefficient (μ)**: Dynamically adjusts based on client divergence
+- **Hybrid Client Selection**: Balances high and low divergence clients for stability
+- **Comprehensive Metrics**: Tracks R² score, MSE loss, training loss, model divergence, and effective μ
+
+## Output Files
+
+After running simulations, the following files are generated:
+
+- `comparison_results.png`: Comprehensive 6-panel comparison plot
+- `r2_comparison.png`: R² score progression comparison
+- `mse_comparison.png`: MSE loss progression comparison
+
+## For More Details
+
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed documentation on:
+- Client selection strategies
+- FedProx algorithm implementation
+- Adaptive μ computation
+- Data flow and architecture
