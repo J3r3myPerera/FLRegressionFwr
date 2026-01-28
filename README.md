@@ -44,7 +44,12 @@ The dataset (`indianPersonalFinanceAndSpendingHabits.csv`) is located at:
 ### Install Dependencies
 
 ```bash
-pip install torch pandas scikit-learn numpy matplotlib
+pip install -r requirements.txt
+```
+
+Or install manually:
+```bash
+pip install torch pandas scikit-learn numpy matplotlib streamlit plotly
 ```
 
 ## Running the Project
@@ -72,6 +77,27 @@ python run_comparison.py
 ```
 
 This runs multiple trials for statistical significance and generates comprehensive comparison plots.
+
+### Run Streamlit Web Interface
+
+Launch the interactive web interface for running simulations:
+
+```bash
+# Install Streamlit if not already installed
+pip install streamlit plotly
+
+# Run the Streamlit app
+streamlit run app.py
+```
+
+The web interface provides:
+- Interactive configuration of simulation parameters
+- Real-time progress tracking
+- Interactive visualizations with Plotly
+- Comparison tables and detailed metrics
+- Downloadable results in CSV format
+
+The app will automatically open in your default web browser at `http://localhost:8501`.
 
 ## Strategies Compared
 
