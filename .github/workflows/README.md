@@ -76,6 +76,25 @@ export DATA_PATH=$(pwd)/../data/indianPersonalFinanceAndSpendingHabits.csv
 python -c "from dataset import _get_data_path; print(_get_data_path())"
 ```
 
+## Why CI Can Fail While Unit Tests Pass
+
+The **Unit Tests** workflow (`test.yml`) only runs `pytest tests/`. The **CI/CD Pipeline** (`ci.yml`) runs more:
+
+| CI/CD step            | Unit Tests equivalent | Can fail if … |
+|-----------------------|------------------------|----------------|
+| Lint (flake8)         | Not run                | Syntax/undefined names (E9, F63, F7, F82) |
+| Check imports         | Implied by pytest      | Missing or wrong imports when run from `FLRegression/` |
+| Test data loading     | `test_data_path_exists`, `test_get_input_dim`, etc. | `DATA_PATH` not set or file missing in checkout |
+| Test model creation   | `test_model_creation`   | Same data path; runs from `working-directory: FLRegression` |
+| Test client init      | `test_client_initialization` | Same as above |
+| **quick-simulation**  | Not run                | FederatedSimulator run fails (assertion, exception, timeout) |
+| **full-simulation**   | Not run                | Only on push to main/develop; `main()` or plotting fails |
+| code-quality (Black/isort) | Not run         | Currently `continue-on-error: true` so does not fail the job |
+
+So Unit Tests can pass (pytest from repo root with `DATA_PATH` set) while CI fails in a step that runs from `FLRegression/`, or in **quick-simulation** / **full-simulation**.
+
+**How to find the exact failure:** In GitHub, open the failed run → click the failed job (e.g. `lint-and-test` or `quick-simulation`) → expand the step that shows a red X. The log for that step is the cause (e.g. `Data file not found`, assertion error, or traceback).
+
 ## Artifacts
 
 The `full-simulation` job uploads the following artifacts:
