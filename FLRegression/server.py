@@ -7,7 +7,6 @@ from client import SimulatedClient
 
 
 class FederatedSimulator:
-    """Simulates federated learning with different strategies."""
     
     def __init__(self, strategy_name: str, config: dict):
         self.strategy_name = strategy_name

@@ -1,7 +1,4 @@
-"""
-Streamlit Frontend for Federated Learning Regression
-Indian Personal Finance - Disposable Income Prediction
-"""
+##Streamlit Frontend for Federated Learning Regression
 
 import streamlit as st
 import numpy as np

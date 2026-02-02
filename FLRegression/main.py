@@ -196,7 +196,7 @@ def print_summary(all_results: dict):
 
 def main():
     NUM_TRIALS = 3 
-    FIXED_SEED = 42
+    FIXED_SEED = 2023
     
     print("\n" + "="*70)
     print("FEDERATED LEARNING STRATEGY COMPARISON")
