@@ -1,8 +1,3 @@
-"""
-Dataset preparation and loading for Indian Personal Finance data.
-Handles data loading, preprocessing, and extreme non-IID partitioning.
-"""
-
 import torch
 import pandas as pd
 import numpy as np
@@ -11,9 +6,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from pathlib import Path
 
-# ============================================================================
 # Data Configuration
-# ============================================================================
 TARGET_COLUMN = "Disposable_Income"
 PARTITION_COLUMN = "City_Tier"  # Non-IID partitioning by city tier
 
@@ -33,9 +26,7 @@ NUMERICAL_COLUMNS = [
 _data_cache = None
 _preprocessors = None
 
-# ============================================================================
 # Data Loading and Preprocessing
-# ============================================================================
 def reset_data_cache():
     """Reset the data cache to force reloading."""
     global _data_cache, _preprocessors
@@ -151,9 +142,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     unique_keys = data_cache["unique_keys"]
     incomes = data_cache["incomes"]
     
-    # =========================================================================
     # EXTREME NON-IID: Multi-dimensional partitioning
-    # =========================================================================
     
     np.random.seed(42 + partition_id)  # Reproducible but different per client
     
@@ -172,10 +161,8 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     primary_indices = np.where(combined_keys == primary_key)[0]
     secondary_indices = np.where(combined_keys == secondary_key)[0]
     
-    # =========================================================================
     # Strategy 2: Income-based label skew
     # Odd partition_ids get high-income bias, even get low-income bias
-    # =========================================================================
     income_percentile = np.percentile(incomes, [25, 75])
     
     if partition_id % 2 == 0:
@@ -193,9 +180,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     if income_mask_secondary.sum() > len(secondary_indices) * 0.3:
         secondary_indices = secondary_indices[income_mask_secondary]
     
-    # =========================================================================
     # Strategy 3: Quantity skew - uneven data distribution
-    # =========================================================================
     # Some clients get more data, some get less
     quantity_factor = 0.5 + (partition_id % 5) * 0.2  # Ranges from 0.5 to 1.3
     

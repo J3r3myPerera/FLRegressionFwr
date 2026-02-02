@@ -1,8 +1,7 @@
-"""
-Shared configuration and constants for federated learning simulation.
-Contains model definition and training code.
-Dataset loading is handled by dataset.py.
-"""
+
+#Shared configuration and constants for federated learning simulation.
+#Contains model definition and training code.
+
 
 import torch
 import torch.nn as nn
@@ -17,10 +16,8 @@ from dataset import (
     reset_data_cache,
 )
 
-# ============================================================================
 # Simulation Configuration
-# ============================================================================
-NUM_ROUNDS = 10
+NUM_ROUNDS = 17
 NUM_CLIENTS = 10
 FRACTION_FIT = 0.5
 LOCAL_EPOCHS = 3
@@ -50,9 +47,7 @@ STRATEGIES = {
     }
 }
 
-# ============================================================================
 # Model Definition
-# ============================================================================
 class Net(nn.Module):
     """MLP Model for Personal Finance Prediction (Regression)."""
 
@@ -77,10 +72,7 @@ class Net(nn.Module):
         x = F.relu(self.bn3(self.fc3(x)))
         return self.fc4(x)
 
-
-# ============================================================================
 # Training and Evaluation Functions
-# ============================================================================
 def compute_model_divergence(local_params, global_params):
     """Compute L2 divergence between local and global model parameters.
 
