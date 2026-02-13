@@ -49,7 +49,7 @@ STRATEGIES = {
 
 # Model Definition
 class Net(nn.Module):
-    """MLP Model for Personal Finance Prediction (Regression)."""
+    #MLP Model for Personal Finance Prediction (Regression)
 
     def __init__(self, input_dim: int = 26):
         super(Net, self).__init__()
@@ -72,13 +72,9 @@ class Net(nn.Module):
         x = F.relu(self.bn3(self.fc3(x)))
         return self.fc4(x)
 
-# Training and Evaluation Functions
 def compute_model_divergence(local_params, global_params):
-    """Compute L2 divergence between local and global model parameters.
-
-    Returns:
-        divergence: L2 norm of (local - global) parameters.
-    """
+    #Compute L2 divergence between local and global model parameters.
+    
     divergence = 0.0
     for local_p, global_p in zip(local_params, global_params):
         divergence += ((local_p - global_p) ** 2).sum().item()
@@ -93,24 +89,6 @@ def compute_adaptive_mu(
     mu_min: float = 0.001,
     mu_max: float = 1.0,
 ) -> float:
-    """Compute adaptive proximal coefficient based on client behavior.
-
-    Adaptive strategy:
-    - Higher historical divergence compared to global average → higher μ
-    - More local epochs → higher μ (prevent excessive drift)
-    - Clients that diverge more need tighter regularization
-
-    Args:
-        base_mu: Base proximal coefficient from config.
-        historical_divergence: This client's historical divergence (from previous rounds).
-        global_avg_divergence: Average divergence across all clients.
-        local_epochs: Number of local training epochs.
-        mu_min: Minimum allowed μ value.
-        mu_max: Maximum allowed μ value.
-
-    Returns:
-        Adaptive μ value clamped between mu_min and mu_max.
-    """
     # Factor 1: Divergence-based scaling
     # If client's historical divergence is higher than global average, increase μ
     if global_avg_divergence > 0 and historical_divergence > 0:
@@ -122,7 +100,7 @@ def compute_adaptive_mu(
     else:
         divergence_factor = 1.0
 
-    # Factor 2: Local epochs scaling (more epochs = higher μ to prevent drift)
+    # Factor 2: Local epochs scaling 
     epoch_factor = 1.0 + 0.1 * (local_epochs - 1)  # Scale up for >1 epoch
 
     # Combine factors
@@ -133,28 +111,7 @@ def compute_adaptive_mu(
 
 
 def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_config=None):
-    """Train the model on the training set using FedProx with optional adaptive μ.
-
-    Args:
-        net: The neural network model.
-        trainloader: DataLoader for training data.
-        epochs: Number of local epochs.
-        lr: Learning rate.
-        device: Device to train on (CPU/GPU).
-        proximal_mu: Proximal term coefficient (0.0 = FedAvg, >0 = FedProx).
-        adaptive_mu_config: Optional dict with adaptive μ settings:
-            - enabled: bool, whether to use adaptive μ
-            - historical_divergence: float, client's historical divergence
-            - global_avg_divergence: float, average divergence across all clients
-            - mu_min: float, minimum μ
-            - mu_max: float, maximum μ
-
-    Returns:
-        dict with:
-            - train_loss: Average training loss.
-            - divergence: Post-training divergence from global model.
-            - effective_mu: The μ value actually used (may be adaptive).
-    """
+    #Train the model on the training set using FedProx with optional adaptive μ.
     net.to(device)  # move model to GPU if available
     net.train()
 
@@ -245,7 +202,7 @@ def test(net, testloader, device):
     # Calculate metrics
     avg_loss = total_loss / max(total_samples, 1)
     
-    # Calculate R² score (coefficient of determination)
+    # Calculate R² score
     all_predictions = torch.cat(all_predictions, dim=0)
     all_targets = torch.cat(all_targets, dim=0)
     

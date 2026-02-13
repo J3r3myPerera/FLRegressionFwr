@@ -270,7 +270,7 @@ def main():
     
     # Sidebar for configuration
     with st.sidebar:
-        st.header("⚙️ Simulation Configuration")
+        st.header("Simulation Configuration")
         
         # Dataset info
         st.subheader("Dataset")
@@ -298,10 +298,10 @@ def main():
             fixed_seed = st.number_input("Seed Value", min_value=0, max_value=10000, value=42, step=1) if use_fixed_seed else None
         
         # Run button
-        run_button = st.button("🚀 Run Simulation", type="primary", use_container_width=True)
+        run_button = st.button("Run Simulation", type="primary", use_container_width=True)
         
         # Reset button
-        if st.button("🔄 Reset", use_container_width=True):
+        if st.button("Reset", use_container_width=True):
             st.session_state.simulation_complete = False
             st.session_state.results = None
             st.rerun()
@@ -323,7 +323,7 @@ def main():
         
         # Note: Module constants are used from module.py
         # The UI parameters are for display/reference - actual values come from module.py
-        st.info(f"ℹ️ Using configuration from module.py: {NUM_CLIENTS} clients, {FRACTION_FIT} fraction fit, {LOCAL_EPOCHS} local epochs, LR={LEARNING_RATE}, Batch={BATCH_SIZE}")
+        st.info(f"Using configuration from module.py: {NUM_CLIENTS} clients, {FRACTION_FIT} fraction fit, {LOCAL_EPOCHS} local epochs, LR={LEARNING_RATE}, Batch={BATCH_SIZE}")
         
         # Check if data file exists
         data_path = os.getenv("DATA_PATH")
@@ -342,7 +342,7 @@ def main():
                     break
             
             if not data_path:
-                st.error("❌ Data file not found! Please ensure 'indianPersonalFinanceAndSpendingHabits.csv' exists in the 'data' directory.")
+                st.error("Data file not found! Please ensure 'indianPersonalFinanceAndSpendingHabits.csv' exists in the 'data' directory.")
                 return
         
         # Initialize data
@@ -351,9 +351,9 @@ def main():
                 reset_data_cache()
                 _load_and_preprocess_data()
                 input_dim = get_input_dim()
-                st.success(f"✅ Data loaded! Input dimension: {input_dim}")
+                st.success(f"Data loaded! Input dimension: {input_dim}")
             except Exception as e:
-                st.error(f"❌ Error loading data: {str(e)}")
+                st.error(f"Error loading data: {str(e)}")
                 st.info("Please ensure the data file exists and is properly formatted.")
                 return
         
@@ -416,7 +416,7 @@ def main():
             all_results = {name: all_trial_results[name][0] for name in selected_strategies if all_trial_results[name]}
         
         progress_bar.progress(1.0)
-        status_text.text("✅ Simulation complete!")
+        status_text.text("Simulation complete!")
         
         # Store results
         st.session_state.results = all_results
@@ -439,10 +439,10 @@ def main():
         results = st.session_state.results
         config = st.session_state.config
         
-        st.success("✅ Simulation completed successfully!")
+        st.success("Simulation completed successfully!")
         
         # Summary metrics
-        st.header("📊 Summary Metrics")
+        st.header("Summary Metrics")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -455,7 +455,7 @@ def main():
             st.metric("Trials", config["num_trials"])
         
         # Final performance comparison table
-        st.header("📈 Final Performance Comparison")
+        st.header("Final Performance Comparison")
         comparison_data = []
         for name, metrics in results.items():
             comparison_data.append({
@@ -475,12 +475,12 @@ def main():
         st.info(f"🏆 **Best performing strategy:** {winner} (Final R² = {results[winner]['r2_scores'][-1]:.4f})")
         
         # Comprehensive plots
-        st.header("📉 Comprehensive Comparison")
+        st.header("Comprehensive Comparison")
         fig_comprehensive = create_metrics_plots(results)
         st.plotly_chart(fig_comprehensive, use_container_width=True)
         
         # Individual metric plots
-        st.header("📊 Individual Metric Plots")
+        st.header("Individual Metric Plots")
         
         col1, col2 = st.columns(2)
         
@@ -507,7 +507,7 @@ def main():
             st.plotly_chart(fig_mu, use_container_width=True)
         
         # Detailed metrics table
-        st.header("📋 Detailed Metrics by Round")
+        st.header("Detailed Metrics by Round")
         
         # Create a combined dataframe
         all_rounds_data = []
@@ -527,10 +527,10 @@ def main():
         st.dataframe(df_detailed, use_container_width=True, hide_index=True)
         
         # Download results
-        st.header("💾 Download Results")
+        st.header("Download Results")
         csv = df_detailed.to_csv(index=False)
         st.download_button(
-            label="📥 Download Detailed Metrics (CSV)",
+            label="Download Detailed Metrics (CSV)",
             data=csv,
             file_name=f"fl_results_{int(time.time())}.csv",
             mime="text/csv"
@@ -538,10 +538,10 @@ def main():
     
     else:
         # Welcome message
-        st.info("👈 Configure your simulation parameters in the sidebar and click 'Run Simulation' to start!")
+        st.info("Configure your simulation parameters in the sidebar and click 'Run Simulation' to start!")
         
         # Show information about strategies
-        st.header("📚 About the Strategies")
+        st.header("About the Strategies")
         
         col1, col2, col3 = st.columns(3)
         

@@ -38,7 +38,7 @@ class SimulatedClient:
             adaptive_mu_config=adaptive_mu_config,
         )
         
-        # Update historical divergence with EMA
+        # Update historical divergence with EMA. Client returns metrics to server.
         alpha = 0.3
         self.historical_divergence = alpha * result["divergence"] + (1 - alpha) * self.historical_divergence
         
