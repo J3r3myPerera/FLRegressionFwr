@@ -35,9 +35,7 @@ def reset_data_cache():
 
 
 def _get_data_path():
-    """Get the path to the CSV data file."""
-    # CSV file is located in the data directory at the workspace root
-    # Support both absolute path (local) and relative path (CI/CD)
+    #Get the path to the CSV data file
     import os
     data_path = os.getenv("DATA_PATH")
     if data_path:
@@ -93,7 +91,7 @@ def _load_and_preprocess_data():
     incomes = df["Income"].values
     
     # Create combined partition key: Occupation + City_Tier + Income_Bracket
-    # This creates ~12+ unique groups for more heterogeneity
+    # 12+ unique groups for more heterogeneity
     income_brackets = pd.qcut(incomes, q=3, labels=["Low", "Medium", "High"]).astype(str)
     combined_keys = np.array([f"{o}_{c}_{i}" for o, c, i in zip(occupations, city_tiers, income_brackets)])
     
@@ -121,7 +119,7 @@ def _load_and_preprocess_data():
 
 
 def get_input_dim():
-    """Get the input dimension for the model."""
+    #Get the input dimension for the model.
     _, preprocessors = _load_and_preprocess_data()
     return preprocessors["input_dim"]
 
@@ -174,7 +172,7 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
         income_mask_primary = incomes[primary_indices] > income_percentile[0]
         income_mask_secondary = incomes[secondary_indices] > income_percentile[0]
     
-    # Apply income filter (keep at least 50% of data even if filter is too strict)
+    # Apply income filter
     if income_mask_primary.sum() > len(primary_indices) * 0.3:
         primary_indices = primary_indices[income_mask_primary]
     if income_mask_secondary.sum() > len(secondary_indices) * 0.3:
