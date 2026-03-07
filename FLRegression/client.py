@@ -56,5 +56,5 @@ class SimulatedClient:
         model = Net(input_dim=input_dim)
         model.load_state_dict(model_state_dict)
         
-        loss, r2 = test(model, self.testloader, DEVICE)
-        return {"loss": loss, "r2": r2, "num_examples": len(self.testloader.dataset)}
+        loss, r2, rmse, mae = test(model, self.testloader, DEVICE)
+        return {"loss": loss, "r2": r2, "rmse": rmse, "mae": mae, "num_examples": len(self.testloader.dataset)}

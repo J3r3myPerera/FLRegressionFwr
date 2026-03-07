@@ -17,6 +17,7 @@ from module import (
     reset_data_cache
 )
 from server import FederatedSimulator
+from metrics_table import generate_per_round_table
 
 
 def plot_comparison(all_results: dict, save_path: str = "comparison_results.png"):
@@ -172,26 +173,28 @@ def save_individual_plots(all_results: dict, colors: dict, markers: dict):
 
 def print_summary(all_results: dict):
     """Print summary table of results."""
-    print("\n" + "="*70)
+    print("\n" + "="*90)
     print("SUMMARY OF RESULTS")
-    print("="*70)
-    print(f"{'Strategy':<20} {'Final R²':>12} {'Final MSE':>12} {'Best R²':>12} {'Lowest MSE':>12}")
-    print("-"*70)
+    print("="*90)
+    print(f"{'Strategy':<20} {'Final R²':>10} {'Final MSE':>11} {'Final RMSE':>12} {'Final MAE':>11} {'Best R²':>10} {'Lowest MSE':>12}")
+    print("-"*90)
     
     for name, metrics in all_results.items():
-        final_r2 = metrics["r2_scores"][-1]
-        final_mse = metrics["mse_losses"][-1]
-        best_r2 = max(metrics["r2_scores"])
+        final_r2   = metrics["r2_scores"][-1]
+        final_mse  = metrics["mse_losses"][-1]
+        final_rmse = metrics["rmse_scores"][-1]
+        final_mae  = metrics["mae_scores"][-1]
+        best_r2    = max(metrics["r2_scores"])
         lowest_mse = min(metrics["mse_losses"])
-        print(f"{name:<20} {final_r2:>12.4f} {final_mse:>12.4f} {best_r2:>12.4f} {lowest_mse:>12.4f}")
+        print(f"{name:<20} {final_r2:>10.4f} {final_mse:>11.4f} {final_rmse:>12.4f} {final_mae:>11.4f} {best_r2:>10.4f} {lowest_mse:>12.4f}")
     
-    print("-"*70)
+    print("-"*90)
     
     # Determine winner
     final_r2_scores = {name: metrics["r2_scores"][-1] for name, metrics in all_results.items()}
     winner = max(final_r2_scores, key=final_r2_scores.get)
     print(f"\n🏆 Best performing strategy: {winner} (R² = {final_r2_scores[winner]:.4f})")
-    print("="*70)
+    print("="*90)
 
 
 def main():
@@ -267,11 +270,13 @@ def main():
             "avg_best_r2": avg_best_r2,
             # Use first trial for plotting (representative)
             "rounds": trials[0]["rounds"],
-            "r2_scores": [np.mean([t["r2_scores"][i] for t in trials]) for i in range(NUM_ROUNDS)],
-            "mse_losses": [np.mean([t["mse_losses"][i] for t in trials]) for i in range(NUM_ROUNDS)],
-            "avg_train_loss": [np.mean([t["avg_train_loss"][i] for t in trials]) for i in range(NUM_ROUNDS)],
-            "avg_divergence": [np.mean([t["avg_divergence"][i] for t in trials]) for i in range(NUM_ROUNDS)],
-            "avg_effective_mu": [np.mean([t["avg_effective_mu"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+            "r2_scores":       [np.mean([t["r2_scores"][i]       for t in trials]) for i in range(NUM_ROUNDS)],
+            "mse_losses":      [np.mean([t["mse_losses"][i]      for t in trials]) for i in range(NUM_ROUNDS)],
+            "rmse_scores":     [np.mean([t["rmse_scores"][i]     for t in trials]) for i in range(NUM_ROUNDS)],
+            "mae_scores":      [np.mean([t["mae_scores"][i]      for t in trials]) for i in range(NUM_ROUNDS)],
+            "avg_train_loss":  [np.mean([t["avg_train_loss"][i]  for t in trials]) for i in range(NUM_ROUNDS)],
+            "avg_divergence":  [np.mean([t["avg_divergence"][i]  for t in trials]) for i in range(NUM_ROUNDS)],
+            "avg_effective_mu":[np.mean([t["avg_effective_mu"][i] for t in trials]) for i in range(NUM_ROUNDS)],
         }
         
         print(f"{strategy_name}:")
@@ -296,12 +301,24 @@ def main():
     
     print("="*70)
     
+    # Per-round metrics tables (one per strategy)
+    print("\nGenerating per-round metrics tables...")
+    generate_per_round_table(
+        all_trial_results=all_trial_results,
+        num_rounds=NUM_ROUNDS,
+        output_dir="outputs/metrics_tables",
+        save_txt=True,
+        save_latex=True,
+    )
+
     # Generate plots with averaged results
     print("\nGenerating comparison plots (averaged across trials)...")
     plot_comparison(aggregated_results)
     
     print("\n✅ All simulations complete!")
     print("Generated files:")
+    print("  - outputs/metrics_tables/table_<Strategy>.txt  (per-round metrics tables)")
+    print("  - outputs/metrics_tables/table_<Strategy>.tex  (LaTeX versions)")
     print("  - comparison_results.png (comprehensive comparison)")
     print("  - r2_comparison.png (R² score only)")
     print("  - mse_comparison.png (MSE loss only)")

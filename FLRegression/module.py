@@ -17,7 +17,7 @@ from dataset import (
 )
 
 # Simulation Configuration
-NUM_ROUNDS = 17
+NUM_ROUNDS = 50
 NUM_CLIENTS = 10
 FRACTION_FIT = 0.5
 LOCAL_EPOCHS = 3
@@ -211,6 +211,9 @@ def test(net, testloader, device):
     r2_score = 1 - (ss_res / max(ss_tot, 1e-8))
     
     # Calculate RMSE
-    rmse = (total_loss / max(total_samples, 1)) ** 0.5
-    
-    return avg_loss, r2_score
+    rmse = avg_loss ** 0.5
+
+    # Calculate MAE
+    mae = (all_targets - all_predictions).abs().mean().item()
+
+    return avg_loss, r2_score, rmse, mae

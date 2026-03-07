@@ -109,7 +109,7 @@ def train_centralized(num_epochs, lr=LEARNING_RATE, batch_size=BATCH_SIZE, seed=
         avg_train_loss = running_loss / max(num_batches, 1)
 
         # Evaluate on test set
-        mse, r2 = test(model, testloader, DEVICE)
+        mse, r2, _rmse, _mae = test(model, testloader, DEVICE)
 
         metrics["epochs"].append(epoch)
         metrics["r2_scores"].append(r2)
@@ -206,7 +206,7 @@ def train_centralized_noniid(num_epochs, lr=LEARNING_RATE, batch_size=BATCH_SIZE
         avg_train_loss = running_loss / max(num_batches, 1)
 
         # Evaluate on the same centralized test set
-        mse, r2 = test(model, testloader, DEVICE)
+        mse, r2, _rmse, _mae = test(model, testloader, DEVICE)
 
         metrics["epochs"].append(epoch)
         metrics["r2_scores"].append(r2)

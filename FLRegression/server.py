@@ -105,8 +105,8 @@ class FederatedSimulator:
         model.load_state_dict(model_state_dict)
         
         test_dataloader = load_centralized_dataset()
-        loss, r2 = test(model, test_dataloader, DEVICE)
-        return loss, r2
+        loss, r2, rmse, mae = test(model, test_dataloader, DEVICE)
+        return loss, r2, rmse, mae
     
     def run(self, num_rounds: int) -> dict:
         """Run federated learning simulation."""
@@ -125,6 +125,8 @@ class FederatedSimulator:
             "rounds": [],
             "r2_scores": [],
             "mse_losses": [],
+            "rmse_scores": [],
+            "mae_scores": [],
             "avg_train_loss": [],
             "avg_divergence": [],
             "avg_effective_mu": [],
@@ -162,7 +164,7 @@ class FederatedSimulator:
             global_state = self.aggregate(client_results)
             
             # Evaluate global model
-            loss, r2 = self.evaluate_global(global_state)
+            loss, r2, rmse, mae = self.evaluate_global(global_state)
             
             # Compute round metrics
             avg_train_loss = np.mean([r["train_loss"] for r in client_results])
@@ -179,11 +181,13 @@ class FederatedSimulator:
             metrics["rounds"].append(round_num)
             metrics["r2_scores"].append(r2)
             metrics["mse_losses"].append(loss)
+            metrics["rmse_scores"].append(rmse)
+            metrics["mae_scores"].append(mae)
             metrics["avg_train_loss"].append(avg_train_loss)
             metrics["avg_divergence"].append(avg_divergence)
             metrics["avg_effective_mu"].append(avg_mu)
             
-            print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}")
+            print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, RMSE = {rmse:.4f}, MAE = {mae:.4f}, Avg μ = {avg_mu:.4f}")
         
         print(f"\n  Final R²: {metrics['r2_scores'][-1]:.4f}")
         return metrics
