@@ -14,6 +14,7 @@ from dataset import (
     load_centralized_dataset,
     _load_and_preprocess_data,
     reset_data_cache,
+    NUM_CLASSES,
 )
 
 # Simulation Configuration
@@ -49,32 +50,62 @@ STRATEGIES = {
 
 # Model Definition
 class Net(nn.Module):
-    #MLP Model for Personal Finance Prediction (Regression)
+    #CNN Model for CIFAR-10 Classification
 
-    def __init__(self, input_dim: int = 26):
+    def __init__(self, num_classes: int = NUM_CLASSES):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.bn1 = nn.BatchNorm1d(128)
-        self.dropout1 = nn.Dropout(0.3)
-        
-        self.fc2 = nn.Linear(128, 64)
-        self.bn2 = nn.BatchNorm1d(64)
-        self.dropout2 = nn.Dropout(0.2)
-        
-        self.fc3 = nn.Linear(64, 32)
-        self.bn3 = nn.BatchNorm1d(32)
-        
-        self.fc4 = nn.Linear(32, 1)  # Single output for regression
+        # Conv Block 1: 3x32x32 -> 32x16x16
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.dropout1 = nn.Dropout(0.2)
+
+        # Conv Block 2: 32x16x16 -> 64x8x8
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.conv4 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.pool2 = nn.MaxPool2d(2, 2)
+        self.dropout2 = nn.Dropout(0.3)
+
+        # Conv Block 3: 64x8x8 -> 128x4x4
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn5 = nn.BatchNorm2d(128)
+        self.pool3 = nn.MaxPool2d(2, 2)
+        self.dropout3 = nn.Dropout(0.4)
+
+        # Fully connected: 128*4*4 -> 128 -> num_classes
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
+        self.bn_fc = nn.BatchNorm1d(128)
+        self.dropout_fc = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
-        x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
-        x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
-        x = F.relu(self.bn3(self.fc3(x)))
-        return self.fc4(x)
+        # Block 1
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.dropout1(self.pool1(x))
+
+        # Block 2
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.relu(self.bn4(self.conv4(x)))
+        x = self.dropout2(self.pool2(x))
+
+        # Block 3
+        x = F.relu(self.bn5(self.conv5(x)))
+        x = self.dropout3(self.pool3(x))
+
+        # Classifier
+        x = x.view(x.size(0), -1)
+        x = self.dropout_fc(F.relu(self.bn_fc(self.fc1(x))))
+        return self.fc2(x)
+
 
 def compute_model_divergence(local_params, global_params):
     #Compute L2 divergence between local and global model parameters.
-    
+
     divergence = 0.0
     for local_p, global_p in zip(local_params, global_params):
         divergence += ((local_p - global_p) ** 2).sum().item()
@@ -100,7 +131,7 @@ def compute_adaptive_mu(
     else:
         divergence_factor = 1.0
 
-    # Factor 2: Local epochs scaling 
+    # Factor 2: Local epochs scaling
     epoch_factor = 1.0 + 0.1 * (local_epochs - 1)  # Scale up for >1 epoch
 
     # Combine factors
@@ -112,7 +143,7 @@ def compute_adaptive_mu(
 
 def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_config=None):
     #Train the model on the training set using FedProx with optional adaptive μ.
-    net.to(device)  # move model to GPU if available
+    net.to(device)
     net.train()
 
     # Store global model parameters for proximal term (before training)
@@ -130,24 +161,24 @@ def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_con
             mu_max=adaptive_mu_config.get("mu_max", 1.0),
         )
 
-    # Use MSELoss for regression task
-    criterion = torch.nn.MSELoss().to(device)
+    # Use CrossEntropyLoss for classification task
+    criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    
+
     running_loss = 0.0
     num_batches = 0
     for _ in range(epochs):
         for batch in trainloader:
-            features, targets = batch
-            features = features.to(device)
-            targets = targets.to(device)
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
             optimizer.zero_grad()
 
             # Forward pass
-            predictions = net(features)
-            
-            # Standard MSE loss for regression
-            loss = criterion(predictions, targets)
+            outputs = net(images)
+
+            # Standard CrossEntropy loss for classification
+            loss = criterion(outputs, labels)
 
             # Add proximal term: (mu/2) * ||w - w^t||^2
             if effective_mu > 0.0:
@@ -174,43 +205,30 @@ def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_con
 
 
 def test(net, testloader, device):
-    """Validate the model on the test set (Regression)."""
+    """Validate the model on the test set (Classification)."""
     net.to(device)
     net.eval()
-    criterion = torch.nn.MSELoss()
-    
+    criterion = torch.nn.CrossEntropyLoss()
+
     total_loss = 0.0
+    correct = 0
     total_samples = 0
-    all_predictions = []
-    all_targets = []
-    
+
     with torch.no_grad():
         for batch in testloader:
-            features, targets = batch
-            features = features.to(device)
-            targets = targets.to(device)
-            
-            predictions = net(features)
-            loss = criterion(predictions, targets)
-            
-            total_loss += loss.item() * features.size(0)
-            total_samples += features.size(0)
-            
-            all_predictions.append(predictions.cpu())
-            all_targets.append(targets.cpu())
-    
-    # Calculate metrics
+            images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = net(images)
+            loss = criterion(outputs, labels)
+
+            total_loss += loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            correct += (predicted == labels).sum().item()
+            total_samples += images.size(0)
+
     avg_loss = total_loss / max(total_samples, 1)
-    
-    # Calculate R² score
-    all_predictions = torch.cat(all_predictions, dim=0)
-    all_targets = torch.cat(all_targets, dim=0)
-    
-    ss_res = ((all_targets - all_predictions) ** 2).sum().item()
-    ss_tot = ((all_targets - all_targets.mean()) ** 2).sum().item()
-    r2_score = 1 - (ss_res / max(ss_tot, 1e-8))
-    
-    # Calculate RMSE
-    rmse = (total_loss / max(total_samples, 1)) ** 0.5
-    
-    return avg_loss, r2_score
+    accuracy = correct / max(total_samples, 1)
+
+    return avg_loss, accuracy
