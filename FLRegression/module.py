@@ -3,6 +3,9 @@
 #Contains model definition and training code.
 
 
+from collections import OrderedDict
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +20,7 @@ from dataset import (
 )
 
 # Simulation Configuration
-NUM_ROUNDS = 17
+NUM_ROUNDS = 25
 NUM_CLIENTS = 10
 FRACTION_FIT = 0.5
 LOCAL_EPOCHS = 3
@@ -71,6 +74,18 @@ class Net(nn.Module):
         x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
         x = F.relu(self.bn3(self.fc3(x)))
         return self.fc4(x)
+
+def get_model_parameters(model):
+    """Get model parameters as a list of NumPy ndarrays."""
+    return [val.cpu().numpy() for _, val in model.state_dict().items()]
+
+
+def set_model_parameters(model, parameters):
+    """Set model parameters from a list of NumPy ndarrays."""
+    params_dict = zip(model.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    model.load_state_dict(state_dict, strict=True)
+
 
 def compute_model_divergence(local_params, global_params):
     #Compute L2 divergence between local and global model parameters.

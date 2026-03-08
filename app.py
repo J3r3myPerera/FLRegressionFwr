@@ -33,7 +33,7 @@ from module import (
     LEARNING_RATE, BATCH_SIZE, DEVICE, STRATEGIES,
     get_input_dim, _load_and_preprocess_data, reset_data_cache
 )
-from server import FederatedSimulator
+from server import run_flower_simulation
 
 # Page configuration
 st.set_page_config(
@@ -74,10 +74,9 @@ def initialize_session_state():
 
 
 def run_single_simulation(strategy_name, config, num_rounds):
-    """Run a single simulation for a strategy."""
+    """Run a single Flower-based simulation for a strategy."""
     try:
-        simulator = FederatedSimulator(strategy_name, config)
-        metrics = simulator.run(num_rounds)
+        metrics = run_flower_simulation(strategy_name, config, num_rounds)
         return metrics
     except Exception as e:
         st.error(f"Error running {strategy_name}: {str(e)}")
