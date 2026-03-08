@@ -52,9 +52,11 @@ class FederatedSimulator:
             sorted_clients = sorted(clients_with_history, key=lambda x: x[1], reverse=True)
             
             # Balanced selection: prioritize middle-divergence clients for stability
-            # 30% high, 50% middle, 20% low
-            num_high = max(1, num_to_select * 3 // 10)
-            num_low = max(1, num_to_select * 2 // 10)
+            # Default: 30% high, 50% middle, 20% low (configurable via config)
+            high_ratio = self.config.get("high_ratio", 0.3)
+            low_ratio = self.config.get("low_ratio", 0.2)
+            num_high = max(1, int(num_to_select * high_ratio))
+            num_low = max(1, int(num_to_select * low_ratio))
             num_mid = num_to_select - num_high - num_low
             
             high_div = [c[0] for c in sorted_clients[:num_high]]
