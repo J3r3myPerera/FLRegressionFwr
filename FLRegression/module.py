@@ -57,22 +57,22 @@ class Net(nn.Module):
     def __init__(self, input_dim: int = 26):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(input_dim, 128)
-        self.bn1 = nn.BatchNorm1d(128)
+        self.ln1 = nn.LayerNorm(128)
         self.dropout1 = nn.Dropout(0.3)
         
         self.fc2 = nn.Linear(128, 64)
-        self.bn2 = nn.BatchNorm1d(64)
+        self.ln2 = nn.LayerNorm(64)
         self.dropout2 = nn.Dropout(0.2)
         
         self.fc3 = nn.Linear(64, 32)
-        self.bn3 = nn.BatchNorm1d(32)
+        self.ln3 = nn.LayerNorm(32)
         
         self.fc4 = nn.Linear(32, 1)  # Single output for regression
 
     def forward(self, x):
-        x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
-        x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
-        x = F.relu(self.bn3(self.fc3(x)))
+        x = self.dropout1(F.relu(self.ln1(self.fc1(x))))
+        x = self.dropout2(F.relu(self.ln2(self.fc2(x))))
+        x = F.relu(self.ln3(self.fc3(x)))
         return self.fc4(x)
 
 def get_model_parameters(model):
@@ -104,22 +104,17 @@ def compute_adaptive_mu(
     mu_min: float = 0.001,
     mu_max: float = 1.0,
 ) -> float:
-    # Factor 1: Divergence-based scaling
-    # If client's historical divergence is higher than global average, increase μ
+    # Scale μ directly by how much this client diverges relative to the global average.
+    # A client 2x more divergent than average gets 2x stronger regularisation;
+    # a client half as divergent gets 0.5x — creating real per-client differentiation.
     if global_avg_divergence > 0 and historical_divergence > 0:
-        # Scale μ based on how much this client diverges vs average
         divergence_ratio = historical_divergence / (global_avg_divergence + 1e-8)
-        # Smooth the ratio to prevent extreme values
-        divergence_factor = 1.0 + 0.5 * (divergence_ratio - 1.0)  # Dampened scaling
-        divergence_factor = max(0.5, min(2.0, divergence_factor))  # Clamp to [0.5, 2.0]
+        # Allow full ratio expression, clipped to [0.2, 4.0] to prevent extremes
+        divergence_ratio = max(0.2, min(4.0, divergence_ratio))
     else:
-        divergence_factor = 1.0
+        divergence_ratio = 1.0
 
-    # Factor 2: Local epochs scaling 
-    epoch_factor = 1.0 + 0.1 * (local_epochs - 1)  # Scale up for >1 epoch
-
-    # Combine factors
-    adaptive_mu = base_mu * divergence_factor * epoch_factor
+    adaptive_mu = base_mu * divergence_ratio
 
     # Clamp to valid range
     return max(mu_min, min(mu_max, adaptive_mu))

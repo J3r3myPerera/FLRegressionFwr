@@ -43,6 +43,7 @@ class CustomFedStrategy(fl.server.strategy.FedAvg):
             "avg_train_loss": [],
             "avg_divergence": [],
             "avg_effective_mu": [],
+            "std_effective_mu": [],
         }
 
     def configure_fit(self, server_round, parameters, client_manager):
@@ -109,19 +110,19 @@ class CustomFedStrategy(fl.server.strategy.FedAvg):
                 self.client_stats[client_id]["divergences"].append(divergence)
                 self.client_stats[client_id]["participation"] += 1
 
-                # Update historical divergence with EMA (same alpha=0.3 as original)
+                # Update historical divergence with EMA (faster alpha=0.5 to build signal quicker)
                 old_div = self.client_stats[client_id]["historical_divergence"]
-                alpha = 0.3
+                alpha = 0.5
                 self.client_stats[client_id]["historical_divergence"] = (
                     alpha * divergence + (1 - alpha) * old_div
                 )
 
-        # Update global average divergence (EMA, same as original)
+        # Update global average divergence (balanced EMA: 50/50 old/new)
         avg_divergence = float(np.mean(divergences)) if divergences else 0.0
         if self.global_avg_divergence == 0:
             self.global_avg_divergence = avg_divergence
         else:
-            self.global_avg_divergence = 0.7 * self.global_avg_divergence + 0.3 * avg_divergence
+            self.global_avg_divergence = 0.5 * self.global_avg_divergence + 0.5 * avg_divergence
 
         # Store round metrics
         self.metrics["rounds"].append(server_round)
@@ -132,6 +133,11 @@ class CustomFedStrategy(fl.server.strategy.FedAvg):
         self.metrics["avg_effective_mu"].append(
             float(np.mean(effective_mus)) if effective_mus else 0.0
         )
+        self.metrics["std_effective_mu"].append(
+            float(np.std(effective_mus)) if len(effective_mus) > 1 else 0.0
+        )
+        if effective_mus and len(effective_mus) > 1:
+            print(f"    μ spread: min={min(effective_mus):.4f}, avg={np.mean(effective_mus):.4f}, max={max(effective_mus):.4f}, std={np.std(effective_mus):.4f}")
 
         # Standard weighted aggregation via parent (FedAvg weighted by num_examples)
         return super().aggregate_fit(server_round, results, failures)
@@ -190,8 +196,9 @@ class CustomFedStrategy(fl.server.strategy.FedAvg):
         sorted_clients = sorted(clients_with_history, key=lambda x: x[1], reverse=True)
 
         # Balanced selection: 30% high, 50% middle, 20% low
-        num_high = max(1, num_to_select * 3 // 10)
-        num_low = max(1, num_to_select * 2 // 10)
+        # Use rounding instead of floor to respect intended proportions
+        num_high = max(1, round(num_to_select * 0.30))
+        num_low = max(1, round(num_to_select * 0.20))
         num_mid = num_to_select - num_high - num_low
 
         high_div = [c[0] for c in sorted_clients[:num_high]]

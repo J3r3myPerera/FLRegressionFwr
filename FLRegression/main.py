@@ -77,15 +77,21 @@ def plot_comparison(all_results: dict, save_path: str = "comparison_results.png"
     ax.legend()
     ax.grid(True, alpha=0.3)
 
-    # Plot 5: Effective μ
+    # Plot 5: Effective μ — show avg line + per-client spread as shaded band
     ax = axes[1, 1]
     for name, metrics in all_results.items():
-        ax.plot(metrics["rounds"], metrics["avg_effective_mu"],
+        rounds = metrics["rounds"]
+        avg_mu = np.array(metrics["avg_effective_mu"])
+        std_mu = np.array(metrics.get("std_effective_mu", [0]*len(rounds)))
+        ax.plot(rounds, avg_mu,
                 color=colors[name], marker=markers[name],
                 linewidth=2, markersize=8, label=name)
+        if np.any(std_mu > 0):
+            ax.fill_between(rounds, avg_mu - std_mu, avg_mu + std_mu,
+                            color=colors[name], alpha=0.15)
     ax.set_xlabel("Federated Round", fontsize=11)
-    ax.set_ylabel("Avg Effective μ", fontsize=11)
-    ax.set_title("Average Proximal Coefficient (μ)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Effective μ (avg ± std across clients)", fontsize=11)
+    ax.set_title("Proximal Coefficient μ (shaded = per-client spread)", fontsize=12, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -271,6 +277,7 @@ def main():
             "avg_train_loss": [np.mean([t["avg_train_loss"][i] for t in trials]) for i in range(NUM_ROUNDS)],
             "avg_divergence": [np.mean([t["avg_divergence"][i] for t in trials]) for i in range(NUM_ROUNDS)],
             "avg_effective_mu": [np.mean([t["avg_effective_mu"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+            "std_effective_mu": [np.mean([t["std_effective_mu"][i] for t in trials]) for i in range(NUM_ROUNDS)],
         }
 
         print(f"{strategy_name}:")

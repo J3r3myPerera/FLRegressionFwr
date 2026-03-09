@@ -42,8 +42,8 @@ class FlowerClient(fl.client.NumPyClient):
                 "enabled": True,
                 "historical_divergence": historical_divergence,
                 "global_avg_divergence": global_avg_divergence,
-                "mu_min": 0.001,
-                "mu_max": 1.0,
+                "mu_min": 0.01,
+                "mu_max": 0.5,
             }
 
         result = train(
