@@ -1,6 +1,5 @@
 """
 FastAPI backend for Federated Learning Regression simulation.
-Replaces the Streamlit-based app.py.
 
 Run with:
     uvicorn api:app --reload --port 8000
@@ -22,7 +21,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
-# Data path setup (same logic as the old Streamlit app)
+# Data path setup
 # ---------------------------------------------------------------------------
 if not os.getenv("DATA_PATH"):
     app_dir = Path(__file__).parent

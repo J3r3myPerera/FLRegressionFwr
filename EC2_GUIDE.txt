@@ -1,0 +1,83 @@
+================================================================================
+FL SIMULATION - AWS EC2 QUICK GUIDE
+================================================================================
+
+INSTANCE DETAILS
+----------------
+Instance Name : FLSimulation
+Instance Type : c5.xlarge (4 vCPUs, 8GB RAM)
+OS            : Ubuntu 24.04 LTS
+Key Pair      : ~/Downloads/fl-simulation-key.pem
+Region        : US East (N. Virginia)
+
+NOTE: Public IP changes every time you start/stop the instance.
+      Check the current IP in AWS Console -> EC2 -> Instances -> FLSimulation
+
+================================================================================
+STEP 1 - START THE INSTANCE
+================================================================================
+1. Go to AWS Console -> EC2 -> Instances
+2. Select "FLSimulation"
+3. Click "Instance state" -> "Start instance"
+4. Wait ~1 minute for it to show "Running"
+5. Copy the new "Public IPv4 address" shown in the instance details
+
+================================================================================
+STEP 2 - SSH INTO THE INSTANCE
+================================================================================
+Run this in your Mac terminal (replace <IP> with the current public IP):
+
+    chmod 400 ~/Downloads/fl-simulation-key.pem
+    ssh -i ~/Downloads/fl-simulation-key.pem ubuntu@<IP>
+
+================================================================================
+STEP 3 - PULL LATEST CODE & RUN
+================================================================================
+Once connected via SSH, run:
+
+    cd FLRegressionFwr
+    source venv/bin/activate
+    git pull
+    uvicorn api:app --host 0.0.0.0 --port 8000
+
+Your app will be live at:  http://<IP>:8000
+
+================================================================================
+STEP 4 - SHARE THE LINK
+================================================================================
+Share this URL with anyone who needs to use it:
+
+    http://<IP>:8000
+
+Remember to send them the updated IP each time you restart the instance.
+
+================================================================================
+STEP 5 - STOP THE INSTANCE WHEN DONE
+================================================================================
+IMPORTANT: Always stop the instance when not in use to avoid charges.
+
+1. Go to AWS Console -> EC2 -> Instances
+2. Select "FLSimulation"
+3. Click "Instance state" -> "Stop instance"
+
+================================================================================
+COSTS (approximate)
+================================================================================
+c5.xlarge running cost : ~$0.17/hr
+Storage (30GB EBS)     : ~$2.40/month (charged even when stopped)
+Elastic IP (if added)  : ~$0.005/hr only when instance is STOPPED
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+If pip install fails with "No space left":
+    sudo growpart /dev/nvme0n1 1
+    sudo resize2fs /dev/nvme0n1p1
+
+If SSH gives "bad permissions" error:
+    chmod 400 ~/Downloads/fl-simulation-key.pem
+
+If app crashes, check logs by running uvicorn with --log-level debug:
+    uvicorn api:app --host 0.0.0.0 --port 8000 --log-level debug
+
+================================================================================
