@@ -48,7 +48,7 @@ def _get_data_path():
         return relative_path
     
     # Fallback to absolute path (for local development)
-    return Path("/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits_cleaned.csv")
+    return Path("/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv")
 
 
 def _load_and_preprocess_data():
