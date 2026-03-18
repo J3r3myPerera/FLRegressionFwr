@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 Or install manually:
 ```bash
-pip install torch pandas scikit-learn numpy matplotlib streamlit plotly
+pip install torch pandas scikit-learn numpy matplotlib fastapi uvicorn
 ```
 
 ## Running the Project
@@ -78,26 +78,22 @@ python run_comparison.py
 
 This runs multiple trials for statistical significance and generates comprehensive comparison plots.
 
-### Run Streamlit Web Interface
+### Run FastAPI Web Interface
 
-Launch the interactive web interface for running simulations:
+Launch the API and web interface:
 
 ```bash
-# Install Streamlit if not already installed
-pip install streamlit plotly
+# Install FastAPI if not already installed
+pip install fastapi uvicorn
 
-# Run the Streamlit app
-streamlit run app.py
+# Run the FastAPI server
+uvicorn api:app --reload --port 8000
 ```
 
-The web interface provides:
-- Interactive configuration of simulation parameters
-- Real-time progress tracking
-- Interactive visualizations with Plotly
-- Comparison tables and detailed metrics
-- Downloadable results in CSV format
-
-The app will automatically open in your default web browser at `http://localhost:8501`.
+The API provides:
+- REST endpoints for running simulations and retrieving results
+- Interactive API docs at `http://localhost:8000/docs`
+- Static frontend at `http://localhost:8000`
 
 ## Strategies Compared
 
