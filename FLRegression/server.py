@@ -128,16 +128,24 @@ class FederatedSimulator:
             "avg_train_loss": [],
             "avg_divergence": [],
             "avg_effective_mu": [],
+            "server_mu": [],
         }
         
+        # Server-level adaptive mu state
+        server_mu = self.config["proximal_mu"]
+        mu_min = self.config.get("mu_min", 0.001)
+        mu_max = self.config.get("mu_max", 1.0)
+        prev_loss = None
+        best_loss = None
+
         # Training config
         train_config = {
             "local_epochs": LOCAL_EPOCHS,
             "lr": LEARNING_RATE,
-            "proximal_mu": self.config["proximal_mu"],
+            "proximal_mu": server_mu,
             "adaptive_mu_enabled": self.config["adaptive_mu_enabled"],
         }
-        
+
         # Track global average divergence across rounds
         global_avg_divergence = 0.0
         
@@ -169,6 +177,21 @@ class FederatedSimulator:
             avg_divergence = np.mean([r["divergence"] for r in client_results])
             avg_mu = np.mean([r["effective_mu"] for r in client_results])
             
+            # Server-level mu adaptation based on global performance
+            if self.config["adaptive_mu_enabled"] and prev_loss is not None:
+                if loss < prev_loss:
+                    server_mu = max(server_mu * 0.97, mu_min)    # slowly relax when improving
+                elif loss > best_loss * 1.05:
+                    server_mu = min(server_mu * 1.5, mu_max)     # spike hard when diverging
+                else:
+                    server_mu = min(server_mu * 1.1, mu_max)     # gently tighten on plateau
+                train_config["proximal_mu"] = server_mu
+
+            # Update best and previous loss
+            if best_loss is None or loss < best_loss:
+                best_loss = loss
+            prev_loss = loss
+
             # Update global average divergence for next round (EMA)
             if global_avg_divergence == 0:
                 global_avg_divergence = avg_divergence
@@ -182,8 +205,9 @@ class FederatedSimulator:
             metrics["avg_train_loss"].append(avg_train_loss)
             metrics["avg_divergence"].append(avg_divergence)
             metrics["avg_effective_mu"].append(avg_mu)
-            
-            print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}")
+            metrics["server_mu"].append(server_mu)
+
+            print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}, Server μ = {server_mu:.4f}")
         
         print(f"\n  Final R²: {metrics['r2_scores'][-1]:.4f}")
         return metrics
