@@ -51,10 +51,11 @@ class FederatedSimulator:
             # Sort by divergence
             sorted_clients = sorted(clients_with_history, key=lambda x: x[1], reverse=True)
             
-            # Balanced selection: prioritize middle-divergence clients for stability
-            # 30% high, 50% middle, 20% low
-            num_high = max(1, num_to_select * 3 // 10)
-            num_low = max(1, num_to_select * 2 // 10)
+            # Balanced selection: split ratios from config (default 30/50/20)
+            pct_high = self.config.get("split_high", 30)
+            pct_low = self.config.get("split_low", 20)
+            num_high = max(1, num_to_select * pct_high // 100)
+            num_low = max(1, num_to_select * pct_low // 100)
             num_mid = num_to_select - num_high - num_low
             
             high_div = [c[0] for c in sorted_clients[:num_high]]
@@ -103,10 +104,10 @@ class FederatedSimulator:
         input_dim = get_input_dim()
         model = Net(input_dim=input_dim)
         model.load_state_dict(model_state_dict)
-        
+
         test_dataloader = load_centralized_dataset()
-        loss, r2 = test(model, test_dataloader, DEVICE)
-        return loss, r2
+        loss, r2, rmse, mae = test(model, test_dataloader, DEVICE)
+        return loss, r2, rmse, mae
     
     def run(self, num_rounds: int) -> dict:
         """Run federated learning simulation."""
@@ -114,23 +115,26 @@ class FederatedSimulator:
         print(f"Running: {self.strategy_name}")
         print(f"Config: {self.config['description']}")
         print(f"{'='*60}")
-        
+
         # Initialize global model
         input_dim = get_input_dim()
         global_model = Net(input_dim=input_dim)
         global_state = global_model.state_dict()
-        
+
         # Metrics storage
         metrics = {
             "rounds": [],
             "r2_scores": [],
             "mse_losses": [],
+            "rmse_scores": [],
+            "mae_scores": [],
             "avg_train_loss": [],
             "avg_divergence": [],
             "avg_effective_mu": [],
             "server_mu": [],
+            "selected_clients": [],
         }
-        
+
         # Server-level adaptive mu state
         server_mu = self.config["proximal_mu"]
         mu_min = self.config.get("mu_min", 0.001)
@@ -148,35 +152,35 @@ class FederatedSimulator:
 
         # Track global average divergence across rounds
         global_avg_divergence = 0.0
-        
+
         for round_num in range(1, num_rounds + 1):
             print(f"\n  Round {round_num}/{num_rounds}")
-            
+
             # Select clients
             selected_ids = self.select_clients(round_num)
             print(f"    Selected clients: {selected_ids}")
-            
+
             # Train on selected clients. server passes the global context to each client
             client_results = []
             for client_id in selected_ids:
                 result = self.clients[client_id].train(global_state, train_config, global_avg_divergence)
                 client_results.append(result)
-                
+
                 # Track stats
                 self.client_stats[client_id]["divergences"].append(result["divergence"])
                 self.client_stats[client_id]["participation"] += 1
-            
+
             # Aggregate
             global_state = self.aggregate(client_results)
-            
+
             # Evaluate global model
-            loss, r2 = self.evaluate_global(global_state)
-            
+            loss, r2, rmse, mae = self.evaluate_global(global_state)
+
             # Compute round metrics
             avg_train_loss = np.mean([r["train_loss"] for r in client_results])
             avg_divergence = np.mean([r["divergence"] for r in client_results])
             avg_mu = np.mean([r["effective_mu"] for r in client_results])
-            
+
             # Server-level mu adaptation based on global performance
             if self.config["adaptive_mu_enabled"] and prev_loss is not None:
                 if loss < prev_loss:
@@ -197,17 +201,20 @@ class FederatedSimulator:
                 global_avg_divergence = avg_divergence
             else:
                 global_avg_divergence = 0.7 * global_avg_divergence + 0.3 * avg_divergence
-            
+
             # Store metrics
             metrics["rounds"].append(round_num)
             metrics["r2_scores"].append(r2)
             metrics["mse_losses"].append(loss)
+            metrics["rmse_scores"].append(rmse)
+            metrics["mae_scores"].append(mae)
             metrics["avg_train_loss"].append(avg_train_loss)
             metrics["avg_divergence"].append(avg_divergence)
             metrics["avg_effective_mu"].append(avg_mu)
             metrics["server_mu"].append(server_mu)
+            metrics["selected_clients"].append(sorted(selected_ids))
 
             print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}, Server μ = {server_mu:.4f}")
-        
+
         print(f"\n  Final R²: {metrics['r2_scores'][-1]:.4f}")
         return metrics

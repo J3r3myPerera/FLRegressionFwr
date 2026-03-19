@@ -4,6 +4,7 @@
 #3. SmartFedProx: Proximal term (μ=0.1), hybrid client selection with adaptive μ
 
 
+import os
 import time
 import numpy as np
 import torch
@@ -17,6 +18,58 @@ from module import (
     reset_data_cache
 )
 from server import FederatedSimulator
+
+
+OUTPUT_DIR = "/Users/dinukaperera/FLRegressionFlwr/outputs"
+
+
+def save_strategy_outputs(all_trial_results: dict, num_rounds: int):
+    """Save per-round metrics for every strategy to the outputs folder, matching table_FedAvg.txt format."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    col = 24  # column width for metric cells
+    row_sep  = "+" + "-"*7 + ("+" + "-"*col)*6 + "+"
+    head_sep = "+" + "="*7 + ("+" + "="*col)*6 + "+"
+
+    for strategy_name, trials in all_trial_results.items():
+        num_trials = len(trials)
+        path = os.path.join(OUTPUT_DIR, f"table_{strategy_name}.txt")
+
+        with open(path, "w") as f:
+            f.write(f"Strategy: {strategy_name}  |  Per-Round Metrics (mean, min-max across {num_trials} trial(s))\n")
+            f.write("=" * (7 + col * 6 + 7) + "\n")
+            f.write(row_sep + "\n")
+            f.write(
+                f"| {'Round':^5} |"
+                f" {'R² (min-max)':^{col-2}} |"
+                f" {'MSE (min-max)':^{col-2}} |"
+                f" {'RMSE (min-max)':^{col-2}} |"
+                f" {'MAE (min-max)':^{col-2}} |"
+                f" {'Train Loss (min-max)':^{col-2}} |"
+                f" {'Avg μ (min-max)':^{col-2}} |\n"
+            )
+            f.write(head_sep + "\n")
+
+            for i in range(num_rounds):
+                round_num = trials[0]["rounds"][i]
+
+                def fmt(key):
+                    vals = [t[key][i] for t in trials]
+                    mean, lo, hi = np.mean(vals), min(vals), max(vals)
+                    return f"{mean:.4f} ({lo:.4f}-{hi:.4f})"
+
+                f.write(
+                    f"| {round_num:^5} |"
+                    f" {fmt('r2_scores'):^{col-2}} |"
+                    f" {fmt('mse_losses'):^{col-2}} |"
+                    f" {fmt('rmse_scores'):^{col-2}} |"
+                    f" {fmt('mae_scores'):^{col-2}} |"
+                    f" {fmt('avg_train_loss'):^{col-2}} |"
+                    f" {fmt('avg_effective_mu'):^{col-2}} |\n"
+                )
+                f.write(row_sep + "\n")
+
+        print(f"  - table_{strategy_name}.txt")
 
 
 def plot_comparison(all_results: dict, save_path: str = "comparison_results.png"):
@@ -300,6 +353,10 @@ def main():
     print("\nGenerating comparison plots (averaged across trials)...")
     plot_comparison(aggregated_results)
     
+    # Save per-strategy metrics tables
+    print(f"\nSaving strategy metrics tables to {OUTPUT_DIR}/...")
+    save_strategy_outputs(all_trial_results, NUM_ROUNDS)
+
     print("\n✅ All simulations complete!")
     print("Generated files:")
     print("  - comparison_results.png (comprehensive comparison)")

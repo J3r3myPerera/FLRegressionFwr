@@ -18,8 +18,8 @@ from dataset import (
 
 # Simulation Configuration
 NUM_ROUNDS = 30
-NUM_CLIENTS = 10
-FRACTION_FIT = 0.5
+NUM_CLIENTS = 12
+FRACTION_FIT = 0.7
 LOCAL_EPOCHS = 3
 LEARNING_RATE = 0.001
 BATCH_SIZE = 64
@@ -56,11 +56,11 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(input_dim, 128)
         self.bn1 = nn.BatchNorm1d(128)
         self.dropout1 = nn.Dropout(0.3)
-        
+
         self.fc2 = nn.Linear(128, 64)
         self.bn2 = nn.BatchNorm1d(64)
         self.dropout2 = nn.Dropout(0.2)
-        
+
         self.fc3 = nn.Linear(64, 32)
         self.bn3 = nn.BatchNorm1d(32)
         
@@ -205,12 +205,13 @@ def test(net, testloader, device):
     # Calculate R² score
     all_predictions = torch.cat(all_predictions, dim=0)
     all_targets = torch.cat(all_targets, dim=0)
-    
+
     ss_res = ((all_targets - all_predictions) ** 2).sum().item()
     ss_tot = ((all_targets - all_targets.mean()) ** 2).sum().item()
     r2_score = 1 - (ss_res / max(ss_tot, 1e-8))
-    
-    # Calculate RMSE
-    rmse = (total_loss / max(total_samples, 1)) ** 0.5
-    
-    return avg_loss, r2_score
+
+    # Calculate RMSE and MAE
+    rmse = avg_loss ** 0.5
+    mae = (all_targets - all_predictions).abs().mean().item()
+
+    return avg_loss, r2_score, rmse, mae
