@@ -20,26 +20,26 @@
           <h2>Simulation Config</h2>
 
           <div class="form-group">
-            <label>Number of Rounds</label>
+            <label for="numRounds">Number of Rounds</label>
             <input type="number" id="numRounds" value="25" min="5" max="50" />
           </div>
           <div class="form-group">
-            <label>Number of Trials</label>
+            <label for="numTrials">Number of Trials</label>
             <input type="number" id="numTrials" value="1" min="1" max="5" />
           </div>
           <div class="form-group">
-            <label>Random Seed</label>
+            <label for="seed">Random Seed</label>
             <input type="number" id="seed" value="42" min="0" max="99999" />
           </div>
 
-          <h2 style="margin-top: 1rem">Server Config</h2>
+          <h2>Server Config</h2>
 
           <div class="form-group">
-            <label>Number of Clients</label>
+            <label for="numClients">Number of Clients</label>
             <input type="number" id="numClients" value="10" min="2" max="50" />
           </div>
           <div class="form-group">
-            <label>Fraction Fit (clients per round)</label>
+            <label for="fractionFit">Fraction Fit (clients per round)</label>
             <input
               type="number"
               id="fractionFit"
@@ -50,50 +50,42 @@
             />
           </div>
           <div class="form-group">
-            <label>Local Epochs</label>
+            <label for="localEpochs">Local Epochs</label>
             <input type="number" id="localEpochs" value="3" min="1" max="20" />
-          </div>
-          <div class="form-group">
-            <label>Batch Size</label>
-            <select id="batchSize">
-              <option value="8">8</option>
-              <option value="16">16</option>
-              <option value="32">32</option>
-              <option value="64" selected>64</option>
-              <option value="128">128</option>
-              <option value="256">256</option>
-              <option value="512">512</option>
-            </select>
           </div>
 
           <div class="form-group">
             <label>Strategies</label>
             <div class="checkbox-group">
-              <input type="checkbox" id="chkFedAvg" checked /><label
-                for="chkFedAvg"
-                >FedAvg</label
-              >
+              <input type="checkbox" id="chkFedAvg" checked />
+              <span class="strategy-dot" style="background: #e74c3c"></span>
+              <label for="chkFedAvg">FedAvg</label>
             </div>
             <div class="checkbox-group">
-              <input type="checkbox" id="chkFedProx" checked /><label
-                for="chkFedProx"
-                >FedProx</label
-              >
+              <input type="checkbox" id="chkFedProx" checked />
+              <span class="strategy-dot" style="background: #3498db"></span>
+              <label for="chkFedProx">FedProx</label>
             </div>
             <div class="checkbox-group">
-              <input type="checkbox" id="chkSmartFedProx" checked /><label
-                for="chkSmartFedProx"
-                >SmartFedProx</label
-              >
+              <input type="checkbox" id="chkSmartFedProx" checked />
+              <span class="strategy-dot" style="background: #2ecc71"></span>
+              <label for="chkSmartFedProx">SmartFedProx</label>
             </div>
           </div>
 
-          <button class="btn btn-primary" id="btnRun" onclick="runSimulation()">
-            Run Simulation
-          </button>
-          <button class="btn btn-secondary" id="btnReset" onclick="resetUI()">
-            Reset
-          </button>
+          <div class="btn-group">
+            <button
+              class="btn btn-primary"
+              id="btnRun"
+              onclick="runSimulation()"
+            >
+              Run Simulation
+            </button>
+            <button class="btn btn-secondary" id="btnReset" onclick="resetUI()">
+              Reset
+            </button>
+          </div>
+          <p class="error-msg hidden" id="validationError"></p>
 
           <div id="progressSection" class="hidden" style="margin-top: 1rem">
             <div class="progress-bar-wrapper">
@@ -105,10 +97,7 @@
           </div>
 
           <!-- runtime config display -->
-          <div
-            id="runtimeConfig"
-            style="margin-top: 1.25rem; font-size: 0.78rem; color: var(--muted)"
-          ></div>
+          <div id="runtimeConfig" class="runtime-info"></div>
         </aside>
 
         <!-- ====== MAIN ====== -->
@@ -119,9 +108,10 @@
               <h3>Getting Started</h3>
               <p style="color: var(--muted); font-size: 0.9rem">
                 Configure parameters on the left and click
-                <strong>Run Simulation</strong>. The backend will train FedAvg,
-                FedProx and SmartFedProx in a federated setting and return
-                per-round metrics.
+                <strong>Run Simulation</strong>. This is will start a simulation
+                on FedAvg, FedProx and SmartFedProx or on the selected
+                stratergies in a federated setting and return per-round metrics
+                with the comparison graphs.
               </p>
             </div>
             <div class="strategy-cards" id="strategyCards"></div>
@@ -133,7 +123,7 @@
             <div class="metrics-row" id="summaryMetrics"></div>
 
             <!-- Winner banner -->
-            <div class="card" id="winnerCard" style="text-align: center"></div>
+            <div class="card winner-card" id="winnerCard"></div>
 
             <!-- Comparison table -->
             <div class="card">
@@ -170,7 +160,7 @@
             <!-- Detailed round table -->
             <div class="card">
               <h3>Detailed Metrics by Round</h3>
-              <div style="overflow-x: auto">
+              <div class="table-scroll">
                 <table id="detailedTable">
                   <thead></thead>
                   <tbody></tbody>

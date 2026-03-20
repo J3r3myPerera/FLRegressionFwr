@@ -30,7 +30,6 @@ const PLOT_LAYOUT = {
     document.getElementById("numClients").value = cfg.num_clients;
     document.getElementById("fractionFit").value = cfg.fraction_fit;
     document.getElementById("localEpochs").value = cfg.local_epochs;
-    document.getElementById("batchSize").value = cfg.batch_size;
 
     const el = document.getElementById("runtimeConfig");
     el.innerHTML = `<strong>Device:</strong> ${cfg.device} &middot; <strong>Input dim:</strong> ${cfg.input_dim}`;
@@ -62,10 +61,13 @@ async function runSimulation() {
     strategies.push("FedProx");
   if (document.getElementById("chkSmartFedProx").checked)
     strategies.push("SmartFedProx");
+  const validationError = document.getElementById("validationError");
   if (strategies.length === 0) {
-    alert("Select at least one strategy.");
+    validationError.textContent = "Select at least one strategy.";
+    validationError.classList.remove("hidden");
     return;
   }
+  validationError.classList.add("hidden");
 
   const payload = {
     strategies,
@@ -77,7 +79,6 @@ async function runSimulation() {
       document.getElementById("fractionFit").value,
     ),
     local_epochs: parseInt(document.getElementById("localEpochs").value),
-    batch_size: parseInt(document.getElementById("batchSize").value),
   };
 
   document.getElementById("btnRun").disabled = true;
@@ -145,9 +146,18 @@ function renderResults(result) {
     .join("");
 
   /* ---- winner ---- */
-  const winnerR2 = metrics[winner].r2_scores.at(-1).toFixed(4);
+  const winnerR2 = metrics[winner].r2_scores.at(-1);
+  const comparisons = Object.keys(metrics)
+    .filter((n) => n !== winner)
+    .map((n) => {
+      const otherR2 = metrics[n].r2_scores.at(-1);
+      const pct = ((winnerR2 - otherR2) / Math.abs(otherR2)) * 100;
+      return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% vs ${n}`;
+    })
+    .join(" &nbsp;·&nbsp; ");
   document.getElementById("winnerCard").innerHTML =
-    `Best performing strategy: <strong>${winner}</strong> (Final R² = ${winnerR2})`;
+    `Best performing strategy: <strong>${winner}</strong> (Final R² = ${winnerR2.toFixed(4)})` +
+    (comparisons ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--muted)">${comparisons}</div>` : "");
 
   /* ---- comparison table ---- */
   const tHead = document.querySelector("#comparisonTable thead");
@@ -166,7 +176,7 @@ function renderResults(result) {
     .join("");
 
   /* ---- charts ---- */
-  const traces = (key, yLabel) =>
+  const traces = (key) =>
     Object.entries(metrics).map(([name, m]) => ({
       x: m.rounds,
       y: m[key],

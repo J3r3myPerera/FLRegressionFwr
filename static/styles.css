@@ -268,6 +268,82 @@ tr:hover td {
   text-decoration: underline;
 }
 
+/* Sidebar section separators */
+.sidebar h2 ~ h2 {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Runtime info strip */
+.runtime-info {
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Input focus */
+.form-group input[type="number"]:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.15);
+}
+
+/* Strategy color dots */
+.strategy-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Strategy card hover */
+.strategy-card {
+  transition: border-color 0.15s;
+}
+.strategy-card:hover {
+  border-color: var(--accent);
+}
+
+/* Button group */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.btn-group .btn-secondary {
+  margin-top: 0;
+}
+
+/* Validation error */
+.error-msg {
+  font-size: 0.82rem;
+  color: var(--red);
+  margin-top: 0.4rem;
+}
+
+/* Winner card */
+.winner-card {
+  text-align: center;
+}
+
+/* Table scroll wrapper */
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Indeterminate progress pulse during run */
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.progress-bar-fill.running {
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
 /* Spinner */
 .spinner {
   display: inline-block;
