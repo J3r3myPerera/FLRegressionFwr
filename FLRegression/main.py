@@ -10,6 +10,7 @@ import torch
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import wandb
 
 from module import (
     NUM_ROUNDS, NUM_CLIENTS, FRACTION_FIT, LOCAL_EPOCHS, 
@@ -234,16 +235,34 @@ def main():
         trial_seed = base_seed + trial * 100
         
         for strategy_name, config in STRATEGIES.items():
-            
+
             np.random.seed(trial_seed)
             torch.manual_seed(trial_seed)
-            
+
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(trial_seed)
-            
+
+            wandb.init(
+                entity="dinuka-20210433-university-of-westminster",
+                project="fl-regression",
+                group=strategy_name,
+                name=f"{strategy_name}_trial_{trial + 1}",
+                config={
+                    "strategy": strategy_name,
+                    "num_rounds": NUM_ROUNDS,
+                    "num_clients": NUM_CLIENTS,
+                    "fraction_fit": FRACTION_FIT,
+                    "local_epochs": LOCAL_EPOCHS,
+                    **config,
+                },
+                reinit="finish_previous",
+            )
+
             simulator = FederatedSimulator(strategy_name, config)
             metrics = simulator.run(NUM_ROUNDS)
             all_trial_results[strategy_name].append(metrics)
+
+            wandb.finish()
     
     # Aggregate results across trials
     print("\n" + "="*70)
@@ -281,7 +300,7 @@ def main():
     
     # Determine winner
     winner = max(aggregated_results.keys(), key=lambda x: aggregated_results[x]["avg_final_r2"])
-    print(f"\n🏆 Best performing strategy: {winner} (R² = {aggregated_results[winner]['avg_final_r2']:.4f} ± {aggregated_results[winner]['std_final_r2']:.4f})")
+    print(f"\n Best performing strategy: {winner} (R² = {aggregated_results[winner]['avg_final_r2']:.4f} ± {aggregated_results[winner]['std_final_r2']:.4f})")
     
     # Check if results are statistically significant
     all_final_r2 = [aggregated_results[name]["avg_final_r2"] for name in STRATEGIES.keys()]
@@ -291,7 +310,7 @@ def main():
     avg_std = np.mean([aggregated_results[name]["std_final_r2"] for name in STRATEGIES.keys()])
     
     if difference < avg_std:
-        print(f"\n⚠️  Note: Strategy differences ({difference:.4f}) are smaller than average std dev ({avg_std:.4f})")
+        print(f"\n Note: Strategy differences ({difference:.4f}) are smaller than average std dev ({avg_std:.4f})")
         print("   Results may vary between runs. Consider running more trials for better statistical power.")
     
     print("="*70)
@@ -300,7 +319,7 @@ def main():
     print("\nGenerating comparison plots (averaged across trials)...")
     plot_comparison(aggregated_results)
     
-    print("\n✅ All simulations complete!")
+    print("\n All simulations complete!")
     print("Generated files:")
     print("  - comparison_results.png (comprehensive comparison)")
     print("  - r2_comparison.png (R² score only)")

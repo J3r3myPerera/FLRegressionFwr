@@ -1,0 +1,1 @@
+{"_step":30,"server_mu":0.9409,"avg_train_loss":0.46815008394809043,"avg_divergence":0.22483453266225895,"_runtime":20.352749083,"r2_score":0.7950475921768207,"avg_effective_mu":0.9927974011797123,"_timestamp":1.774163402161422e+09,"_wandb":{"runtime":20},"mse_loss":0.23392032957077027}
