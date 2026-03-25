@@ -1,11 +1,4 @@
-"""
-Standalone script to visualize the data distribution across simulated FL clients.
-Run manually when needed — not part of the main simulation pipeline.
-
-Usage:
-    cd FLRegression
-    python visualize_clients.py
-"""
+# Standalone script to visualize the data distribution across simulated FL clients.
 
 import sys
 import os
@@ -16,6 +9,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from pathlib import Path
+
+# Add FLRegression to path so we can import project modules
+sys.path.insert(0, str(Path(__file__).parent.parent / "FLRegression"))
 
 # Reuse project config
 from module import NUM_CLIENTS, NUM_ROUNDS, FRACTION_FIT, LOCAL_EPOCHS, LEARNING_RATE, BATCH_SIZE
@@ -30,10 +26,7 @@ from dataset import (
 
 OUTPUT_DIR = Path(__file__).parent.parent / "outputs" / "dataset_stats"
 
-
-# ---------------------------------------------------------------------------
 # Partition index extraction (mirrors dataset.load_data but returns indices)
-# ---------------------------------------------------------------------------
 
 def get_partition_indices(partition_id: int, num_partitions: int) -> np.ndarray:
     """Return the row indices assigned to a given client."""
@@ -98,10 +91,7 @@ def build_client_dataframes(df: pd.DataFrame, num_clients: int) -> dict:
         for cid in range(num_clients)
     }
 
-
-# ---------------------------------------------------------------------------
-# Figures
-# ---------------------------------------------------------------------------
+# outputs
 
 def _save(fig, name: str):
     fig.savefig(OUTPUT_DIR / f"{name}.png", dpi=150, bbox_inches="tight")
@@ -248,10 +238,7 @@ def plot_table_summary(df_full: pd.DataFrame):
     fig.tight_layout()
     _save(fig, "fig_table_summary")
 
-
-# ---------------------------------------------------------------------------
 # LaTeX tables
-# ---------------------------------------------------------------------------
 
 def _save_tex(content: str, name: str):
     path = OUTPUT_DIR / f"{name}.tex"
@@ -347,10 +334,7 @@ def tex_per_client(client_dfs: dict):
     lines += [r"\hline", r"\end{tabular}"]
     _save_tex("\n".join(lines), "table_per_client")
 
-
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
