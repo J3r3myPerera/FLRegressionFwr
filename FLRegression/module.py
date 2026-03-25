@@ -101,7 +101,7 @@ def compute_adaptive_mu(
         divergence_factor = 1.0
 
     # Factor 2: Local epochs scaling 
-    epoch_factor = 1.0 + 0.1 * (local_epochs - 1)  # Scale up for >1 epoch
+    epoch_factor = 1.0 + 0.1 * (local_epochs - 1) 
 
     # Combine factors
     adaptive_mu = base_mu * divergence_factor * epoch_factor
