@@ -17,9 +17,9 @@ from dataset import (
 )
 
 # Simulation Configuration
-NUM_ROUNDS = 30
-NUM_CLIENTS = 10
-FRACTION_FIT = 0.5
+NUM_ROUNDS = 25
+NUM_CLIENTS = 12
+FRACTION_FIT = 0.7
 LOCAL_EPOCHS = 3
 LEARNING_RATE = 0.001
 BATCH_SIZE = 64
@@ -174,7 +174,7 @@ def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_con
 
 
 def test(net, testloader, device):
-    """Validate the model on the test set (Regression)."""
+    """Validate the model on the test set."""
     net.to(device)
     net.eval()
     criterion = torch.nn.MSELoss()
