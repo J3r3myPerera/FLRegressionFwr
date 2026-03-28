@@ -20,9 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-# ---------------------------------------------------------------------------
 # Data path setup
-# ---------------------------------------------------------------------------
 if not os.getenv("DATA_PATH"):
     app_dir = Path(__file__).parent
     for candidate in [
@@ -44,9 +42,7 @@ from module import (
 )
 from server import FederatedSimulator
 
-# ---------------------------------------------------------------------------
 # Application state
-# ---------------------------------------------------------------------------
 simulation_store: dict = {}          # latest results keyed by run id
 simulation_status: dict = {}         # "idle" | "running" | "done" | "error"
 current_run_id: Optional[str] = None
@@ -74,9 +70,7 @@ static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
-# ---------------------------------------------------------------------------
 # Pydantic schemas
-# ---------------------------------------------------------------------------
 class SimulationRequest(BaseModel):
     strategies: list[str] = Field(
         default=["FedAvg", "FedProx", "SmartFedProx"],
@@ -101,14 +95,9 @@ class StrategyInfo(BaseModel):
     description: str
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 def _run_simulation(req: SimulationRequest) -> dict:
     """Blocking simulation runner (called inside a thread)."""
-    # ---- Temporarily patch module-level constants so that server.py /
-    #      client.py pick up the user-supplied values. We restore them
-    #      afterwards to keep the module in a clean state.
     import server as _server_mod
     _saved = {
         "NUM_CLIENTS": _module.NUM_CLIENTS,
@@ -139,7 +128,7 @@ def _run_simulation(req: SimulationRequest) -> dict:
 
 
 def _run_simulation_inner(req: SimulationRequest) -> dict:
-    """The actual simulation logic (runs with patched module constants)."""
+    """The simulation logic (runs with patched module constants)."""
     reset_data_cache()
     _load_and_preprocess_data()
 
@@ -229,10 +218,7 @@ def _run_simulation_inner(req: SimulationRequest) -> dict:
         "winner": winner,
     }
 
-
-# ---------------------------------------------------------------------------
 # Routes
-# ---------------------------------------------------------------------------
 @app.get("/")
 async def root():
     """Serve the frontend."""
@@ -278,13 +264,7 @@ async def get_status():
 
 @app.post("/api/simulate")
 async def run_simulation(req: SimulationRequest):
-    """
-    Launch a federated learning simulation.
-
-    This runs **synchronously** in a background thread so the event-loop
-    stays responsive. Poll ``GET /api/status`` to watch progress, then
-    ``GET /api/results`` when status is ``done``.
-    """
+    """Launch a federated learning simulation."""
     global current_run_id
 
     # Validate strategy names

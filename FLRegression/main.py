@@ -151,7 +151,7 @@ def save_individual_plots(all_results: dict, colors: dict, markers: dict):
     plt.tight_layout()
     plt.savefig("r2_comparison.png", dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print("✓ R² comparison plot saved to 'r2_comparison.png'")
+    print("R² comparison plot saved to 'r2_comparison.png'")
     
     # MSE Loss only
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -168,7 +168,7 @@ def save_individual_plots(all_results: dict, colors: dict, markers: dict):
     plt.tight_layout()
     plt.savefig("mse_comparison.png", dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print("✓ MSE comparison plot saved to 'mse_comparison.png'")
+    print("MSE comparison plot saved to 'mse_comparison.png'")
 
 
 def print_summary(all_results: dict):
@@ -191,7 +191,7 @@ def print_summary(all_results: dict):
     # Determine winner
     final_r2_scores = {name: metrics["r2_scores"][-1] for name, metrics in all_results.items()}
     winner = max(final_r2_scores, key=final_r2_scores.get)
-    print(f"\n🏆 Best performing strategy: {winner} (R² = {final_r2_scores[winner]:.4f})")
+    print(f"Best performing strategy: {winner} (R² = {final_r2_scores[winner]:.4f})")
     print("="*70)
 
 
@@ -312,7 +312,6 @@ def main():
     if difference < avg_std:
         print(f"\n Note: Strategy differences ({difference:.4f}) are smaller than average std dev ({avg_std:.4f})")
         print("   Results may vary between runs. Consider running more trials for better statistical power.")
-    
     print("="*70)
     
     # Generate plots with averaged results
