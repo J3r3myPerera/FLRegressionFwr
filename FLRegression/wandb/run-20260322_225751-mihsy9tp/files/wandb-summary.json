@@ -1,1 +1,0 @@
-{"server_mu":1,"_wandb":{"runtime":16},"mse_loss":0.2846043360233307,"avg_train_loss":0.4368352597261393,"avg_divergence":0.22683682378514555,"_runtime":16.343822667,"_timestamp":1.774200491739177e+09,"r2_score":0.7506401168103551,"_step":30,"avg_effective_mu":0.9900919192255285}

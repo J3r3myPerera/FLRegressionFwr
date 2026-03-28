@@ -1,1 +1,0 @@
-{"mse_loss":0.3630128285884857,"avg_divergence":0.433392497313295,"r2_score":0.6819415186715175,"avg_effective_mu":0.1,"_runtime":20.3544115,"_timestamp":1.774162770853143e+09,"_step":30,"server_mu":0.1,"_wandb":{"runtime":20},"avg_train_loss":0.5312274555143578}

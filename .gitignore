@@ -48,6 +48,10 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# WandB
+wandb/
+**/wandb/
+
 # Project specific
 *.png
 *.jpg
