@@ -207,15 +207,16 @@ class FederatedSimulator:
             metrics["avg_divergence"].append(avg_divergence)
             metrics["avg_effective_mu"].append(avg_mu)
             metrics["server_mu"].append(server_mu)
-            # Log live metrics to wandb
-            wandb.log({
-                "r2_score": r2,
-                "mse_loss": loss,
-                "avg_train_loss": avg_train_loss,
-                "avg_divergence": avg_divergence,
-                "avg_effective_mu": avg_mu,
-                "server_mu": server_mu,
-            }, step=round_num)
+            # Log live metrics to wandb (only if a run is active)
+            if wandb.run is not None:
+                wandb.log({
+                    "r2_score": r2,
+                    "mse_loss": loss,
+                    "avg_train_loss": avg_train_loss,
+                    "avg_divergence": avg_divergence,
+                    "avg_effective_mu": avg_mu,
+                    "server_mu": server_mu,
+                }, step=round_num)
             print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}")
         
         print(f"\n  Final R²: {metrics['r2_scores'][-1]:.4f}")
