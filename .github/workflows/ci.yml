@@ -139,7 +139,7 @@ jobs:
           module.NUM_CLIENTS = test_clients
 
           try:
-              metrics = simulator.run(test_rounds)
+              metrics, _ = simulator.run(test_rounds)
               print(f'FedAvg completed: Final R² = {metrics[\"r2_scores\"][-1]:.4f}')
               assert len(metrics['r2_scores']) == test_rounds, 'Should have metrics for all rounds'
               print('Quick simulation test passed!')
