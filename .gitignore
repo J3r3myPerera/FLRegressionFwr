@@ -54,9 +54,11 @@ wandb/
 
 # Project specific
 *.png
+!FLRegression/resultOutput/*.png
 *.jpg
 *.jpeg
 *.pt
+!FLRegression/resultOutput/*.pt
 *.pth
 *.csv
 !data/indianPersonalFinanceAndSpendingHabits.csv
@@ -70,3 +72,6 @@ Thumbs.db
 # CI/CD artifacts
 artifacts/
 test-results/
+
+#Flower implementation data
+FlowerImplementation/data/

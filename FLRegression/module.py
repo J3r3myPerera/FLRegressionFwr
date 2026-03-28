@@ -17,7 +17,7 @@ from dataset import (
 )
 
 # Simulation Configuration
-NUM_ROUNDS = 25
+NUM_ROUNDS = 20
 NUM_CLIENTS = 12
 FRACTION_FIT = 0.7
 LOCAL_EPOCHS = 3

@@ -220,4 +220,4 @@ class FederatedSimulator:
             print(f"    R² = {r2:.4f}, MSE = {loss:.4f}, Avg μ = {avg_mu:.4f}")
         
         print(f"\n  Final R²: {metrics['r2_scores'][-1]:.4f}")
-        return metrics
+        return metrics, global_state
