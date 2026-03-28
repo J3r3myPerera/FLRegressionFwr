@@ -1,239 +1,222 @@
 # Federated Learning for Personal Finance Prediction
 
-This project implements a **Federated Learning** system for predicting disposable income using the Indian Personal Finance dataset. It compares three federated learning strategies: **FedAvg**, **FedProx**, and **SmartFedProx** with adaptive μ and hybrid client selection.
+This project implements a **Federated Learning** system for predicting disposable income from the Indian Personal Finance dataset. It contains two separate implementations:
+
+1. **FLRegression** — a custom simulation framework comparing FedAvg, FedProx, and SmartFedProx
+2. **FlowerImplementation** — the same three strategies rebuilt on the [Flower (flwr)](https://flower.ai) federated learning framework
+
+---
 
 ## Project Structure
 
 ```
 FLRegressionFlwr/
-├── api.py                                  # FastAPI backend for running simulations
-├── requirements.txt                        # Project dependencies
-├── EC2_GUIDE.txt                           # AWS EC2 deployment guide
-├── centralized_model_comparison.ipynb      # Model selection & comparison notebook
-├── pytest.ini                              # Test configuration
-├── README.md                               # This file
 ├── FLRegression/
-│   ├── dataset.py                          # Dataset loading and preprocessing
-│   ├── module.py                           # Model definition, training functions, and configuration
-│   ├── client.py                           # SimulatedClient class for local training
-│   ├── server.py                           # FederatedSimulator with server-side adaptive μ
-│   ├── main.py                             # Main entry point for running simulations
-│   └── run_comparison.py                   # Comparison script for all three strategies
-├── static/
-│   ├── index.html                          # Web interface
-│   ├── app.js                              # Interactive frontend with Plotly charts
-│   └── styles.css                          # Dark-themed UI styling
+│   ├── dataset.py                    # Dataset loading and non-IID partitioning
+│   ├── module.py                     # Model definition, training, configuration
+│   ├── client.py                     # SimulatedClient class for local training
+│   ├── server.py                     # FederatedSimulator with WandB integration
+│   ├── main.py                       # Entry point — runs 3 trials, logs to WandB
+│   └── resultOutput/                 # Generated plots and saved models (gitignored)
+├── FlowerImplementation/
+│   ├── data/
+│   │   └── indianPersonalFinanceAndSpendingHabits.csv
+│   ├── quickstart-pytorch/
+│   │   ├── pyproject.toml            # Flower app config and dependencies
+│   │   └── pytorchexample/
+│   │       ├── task.py               # Model, data loading, train/test functions
+│   │       ├── client_app.py         # Flower ClientApp
+│   │       └── server_app.py         # Flower ServerApp (all three strategies)
+│   └── README.md                     # Flower implementation details
 ├── data/
-│   └── indianPersonalFinanceAndSpendingHabits.csv
+│   ├── indianPersonalFinanceAndSpendingHabits.csv
+│   ├── DFA.ipynb                     # Data feature analysis notebook
+│   └── visualize_clients.py          # Client data distribution visualizer
+├── model/
+│   └── ModelTesting.ipynb            # Centralized model architecture comparison
+├── api.py                            # FastAPI backend for running simulations
+├── static/
+│   ├── index.html                    # Web dashboard
+│   ├── app.js                        # Interactive Plotly frontend
+│   └── styles.css                    # Dark-themed UI styling
+├── outputs/                          # Generated output PNGs (gitignored)
 ├── tests/
-│   └── test_basic.py                       # Unit tests
+│   └── test_basic.py
 ├── scripts/
-│   └── run_tests.sh                        # Test runner script
+│   └── run_tests.sh
+├── requirements.txt
 └── .github/workflows/
-    ├── ci.yml                              # Main CI pipeline
-    └── test.yml                            # Unit test pipeline
+    ├── ci.yml
+    └── test.yml
 ```
+
+---
 
 ## Dataset
 
-The dataset (`indianPersonalFinanceAndSpendingHabits.csv`) is located in the `data/` directory.
+**File:** `data/indianPersonalFinanceAndSpendingHabits.csv`
 
-**Target Variable:** `Disposable_Income` (regression task)
+**Target Variable:** `Disposable_Income` (regression task — standardized during training)
 
-**Features:** Income, Age, Dependents, Rent, Loan_Repayment, Insurance, various spending categories, and potential savings.
+**Features:** Income, Age, Dependents, Rent, Loan_Repayment, Insurance, spending categories, and potential savings. Categorical columns (`Occupation`, `City_Tier`) are one-hot encoded.
 
-**Non-IID Partitioning:** The data is partitioned using extreme non-IID strategy:
-- Primary split by Occupation + City_Tier + Income_Bracket
-- Label skew: Some clients only see high/low disposable income samples
-- Quantity skew: Uneven data distribution across clients
+**Non-IID Partitioning:** Data is partitioned by a composite key of `Occupation + City_Tier + Income_Bracket`, producing realistic label and quantity skew across clients.
 
-## Installation
+---
 
-### Prerequisites
+## FLRegression — Custom Simulation
 
-- Python 3.10+
-- PyTorch
-
-### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Or install manually:
-```bash
-pip install torch pandas scikit-learn numpy matplotlib plotly fastapi "uvicorn[standard]"
-```
-
-## Running the Project
-
-### Run Main Simulation
-
-Run the main federated learning simulation comparing all three strategies:
+### Running the Simulation
 
 ```bash
 cd FLRegression
 python main.py
 ```
 
-This will:
-- Run simulations for FedAvg, FedProx, and SmartFedProx
-- Generate comparison plots (R² score, MSE loss, training loss, divergence, effective μ)
-- Save results to `comparison_results.png`, `r2_comparison.png`, and `mse_comparison.png`
+This runs **3 trials** of each strategy, averages the results, logs all metrics to **WandB**, and saves plots and models to `FLRegression/resultOutput/`.
 
-### Run Comparison Script
+### Configuration
 
-Run the detailed comparison script with multiple trials:
+Defined in `FLRegression/module.py`:
+
+| Parameter | Value | Description |
+|---|---|---|
+| `NUM_ROUNDS` | `20` | Federated rounds per strategy |
+| `NUM_CLIENTS` | `12` | Total number of simulated clients |
+| `FRACTION_FIT` | `0.7` | Fraction of clients selected per round |
+| `LOCAL_EPOCHS` | `3` | Local training epochs per client |
+| `LEARNING_RATE` | `0.001` | Adam optimizer learning rate |
+| `BATCH_SIZE` | `64` | Batch size for local training |
+
+### Output Files
+
+Saved to `FLRegression/resultOutput/` (gitignored):
+
+| File | Description |
+|---|---|
+| `comparison_results.png` | 6-panel plot: R², MSE, training loss, divergence, μ, final bar chart |
+| `r2_comparison.png` | R² score progression per round |
+| `mse_comparison.png` | MSE loss progression per round |
+| `FedAvg_final_model.pt` | Final FedAvg model weights |
+| `FedProx_final_model.pt` | Final FedProx model weights |
+| `SmartFedProx_final_model.pt` | Final SmartFedProx model weights |
+
+### WandB Integration
+
+Each strategy run across each trial is logged to WandB under project `fl-regression`. Metrics logged per round: R² score, MSE loss, training loss, model divergence, and effective μ.
+
+---
+
+## FlowerImplementation — Flower Framework
+
+### Running the Simulation
 
 ```bash
-python run_comparison.py
+cd FlowerImplementation/quickstart-pytorch
+flwr run .
 ```
 
-This runs multiple trials for statistical significance and generates comprehensive comparison plots.
+Launches a local Flower simulation with 12 supernodes, runs all three strategies sequentially, and saves plots to the `quickstart-pytorch/` directory.
 
-### Run FastAPI Web Interface
+See [FlowerImplementation/README.md](FlowerImplementation/README.md) for full details on configuration and output.
 
-Launch the API and web dashboard:
+---
+
+## Strategies
+
+### FedAvg
+
+Baseline federated averaging. No proximal term (`mu=0`), random client selection each round.
+
+### FedProx
+
+FedProx with a fixed proximal coefficient `mu=0.1`. Adds `(mu/2) * ||w - w_global||²` to the client loss to limit drift from the global model. Random client selection.
+
+### SmartFedProx
+
+An enhanced FedProx variant with three key additions:
+
+- **Adaptive μ (client-side):** Per-client μ is computed each round based on that client's historical divergence relative to the global average, scaled by local epochs. μ is clamped to `[0.001, 1.0]`.
+- **Hybrid client selection:** After a 3-round random cold start and excluding 15% random exploration rounds, clients are ranked by smoothed divergence history and selected with a **30% high / 50% mid / 20% low** divergence split.
+- **Server-side μ adaptation:** After each round the server adjusts the global μ: relaxed (×0.97) if loss is improving, spiked (×1.5) if divergence is detected, or gently tightened (×1.1) on plateau.
+
+---
+
+## Model Architecture
+
+Both implementations share the same MLP (`Net`) for regression:
+
+```
+Input (dynamic input_dim)
+  → Linear(128) → BatchNorm1d → ReLU → Dropout(0.3)
+  → Linear(64)  → BatchNorm1d → ReLU → Dropout(0.2)
+  → Linear(32)  → BatchNorm1d → ReLU
+  → Linear(1)   → scalar output (disposable income)
+```
+
+---
+
+## FastAPI Web Dashboard
 
 ```bash
 uvicorn api:app --reload --port 8000
 ```
 
-Then open `http://localhost:8000` in your browser.
+Open `http://localhost:8000` in your browser.
 
 **API Endpoints:**
+
 | Endpoint | Method | Description |
 |---|---|---|
-| `/` | GET | Serve the web dashboard |
-| `/api/config` | GET | Get server configuration |
-| `/api/simulate` | POST | Run a simulation with custom parameters |
-| `/api/results/{run_id}` | GET | Fetch results for a specific run |
-| `/docs` | GET | Interactive OpenAPI documentation |
+| `/` | GET | Web dashboard |
+| `/api/config` | GET | Server configuration |
+| `/api/simulate` | POST | Run simulation with custom parameters |
+| `/api/results/{run_id}` | GET | Fetch results for a run |
+| `/docs` | GET | Interactive OpenAPI docs |
 
-**Configurable Simulation Parameters:**
-- Number of rounds (5–50)
-- Number of trials (1–5)
-- Number of clients (2–50)
-- Fraction fit (0.1–1.0)
-- Local epochs (1–20)
-- Batch size (8–512)
-- Learning rate (0.00001–0.1)
+The dashboard provides a dark-themed UI with real-time Plotly charts for R², MSE, training loss, divergence, and μ across all three strategies.
 
-## Web Dashboard
+---
 
-The project includes a modern, interactive web interface built with vanilla JS and Plotly:
+## Installation
 
-- **Dark-themed UI** with color-coded strategy cards (FedAvg in red, FedProx in blue, SmartFedProx in green)
-- **Real-time simulation tracking** with progress updates
-- **Interactive Plotly charts** for visualizing R² scores, MSE loss, training loss, divergence, and μ progression
-- **Configurable parameters** via the dashboard before launching simulations
-
-## Strategies Compared
-
-1. **FedAvg**: Baseline federated averaging (μ=0, random client selection)
-2. **FedProx**: FedProx with fixed μ=0.1 and random client selection
-3. **SmartFedProx**: FedProx with adaptive μ and hybrid client selection
-   - Cold start: 3 rounds of random selection before switching to hybrid
-   - 15% exploration rate for diversity
-   - Hybrid selection: 30% high-divergence, 50% middle, 20% low-divergence clients
-
-## Server-Side Adaptive μ Computation
-
-The server dynamically adjusts the proximal coefficient (μ) each round based on global performance:
-
-- **Loss improving** → μ relaxed (×0.97) to allow faster convergence
-- **Divergence detected** → μ spiked (×1.5) to pull clients back toward the global model
-- **Convergence plateau** → μ gently tightened (×1.1) to refine the model
-
-Global divergence is tracked using an Exponential Moving Average (EMA) across all participating clients, giving the server a smooth signal to react to.
-
-## Configuration
-
-Key configuration parameters are defined in `FLRegression/module.py`:
-
-- `NUM_ROUNDS = 20`: Number of federated learning rounds
-- `NUM_CLIENTS = 10`: Number of clients
-- `FRACTION_FIT = 0.5`: Fraction of clients selected per round
-- `LOCAL_EPOCHS = 3`: Local training epochs per client
-- `LEARNING_RATE = 0.001`: Learning rate for Adam optimizer
-- `BATCH_SIZE = 64`: Batch size for training
-
-## Model Architecture
-
-The model is a Multi-Layer Perceptron (MLP) for regression:
-- Input: 26 features (after preprocessing)
-- Hidden layers: 128 → 64 → 32 neurons
-- Output: 1 neuron (disposable income prediction)
-- Activation: ReLU with BatchNorm and Dropout (0.3, 0.2)
-
-A centralized model comparison notebook (`centralized_model_comparison.ipynb`) is included for evaluating and comparing different model architectures on the dataset.
-
-## Key Features
-
-- **Extreme Non-IID Data Partitioning**: Realistic heterogeneous data distribution
-- **Server-Side Adaptive μ**: Server dynamically adjusts the proximal coefficient based on global loss and divergence trends
-- **Client-Side Adaptive μ**: Clients further adjust μ based on local divergence
-- **Hybrid Client Selection**: Balances high, middle, and low divergence clients for stability
-- **FastAPI REST API**: Production-ready backend with configurable simulation parameters
-- **Interactive Web Dashboard**: Real-time dark-themed UI with Plotly visualizations
-- **AWS EC2 Deployment**: Ready-to-deploy on `c5.xlarge` instances (~$0.17/hr)
-- **Comprehensive Metrics**: Tracks R² score, MSE loss, training loss, model divergence, and effective μ
-
-## AWS EC2 Deployment
-
-The project can be deployed on AWS EC2 for remote access. See `EC2_GUIDE.txt` for the full setup guide.
-
-**Quick start:**
 ```bash
-# SSH into your instance
-ssh -i your-key.pem ubuntu@<your-ec2-ip>
-
-# Clone and install
-git clone <repo-url> && cd FLRegressionFlwr
 pip install -r requirements.txt
-
-# Launch the server
-uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
-**Recommended instance:** `c5.xlarge` (4 vCPUs, 8GB RAM) on Ubuntu 24.04 LTS.
+Dependencies: `torch`, `pandas`, `scikit-learn`, `numpy`, `matplotlib`, `wandb`, `plotly`, `fastapi`, `uvicorn`.
+
+For the Flower implementation, install separately:
+
+```bash
+cd FlowerImplementation/quickstart-pytorch
+pip install -e .
+```
+
+---
 
 ## CI/CD Pipeline
 
-This project includes a comprehensive CI/CD pipeline using GitHub Actions:
+GitHub Actions runs on every push and pull request:
 
-- **Automated Testing**: Runs on every push and pull request
-- **Code Quality Checks**: Linting with flake8, formatting checks with Black and isort
-- **Simulation Validation**: Quick and full simulation tests
-- **Multi-Python Support**: Tests on Python 3.10 and 3.11
-- **Coverage Reporting**: pytest with Codecov integration
+- **Code quality:** flake8 linting, Black and isort formatting checks
+- **Tests:** pytest with coverage reporting
+- **Multi-Python:** Python 3.10 and 3.11
 
 ### Running Tests Locally
 
 ```bash
-# Install test dependencies
-pip install -r requirements.txt
 pip install pytest pytest-cov flake8
-
-# Run all tests
 pytest tests/ -v
-
-# Run quick CI simulation
 ./scripts/run_tests.sh
 ```
 
-## Output Files
+---
 
-After running simulations, the following files are generated:
+## AWS EC2 Deployment
 
-- `comparison_results.png`: Comprehensive 6-panel comparison plot
-- `r2_comparison.png`: R² score progression comparison
-- `mse_comparison.png`: MSE loss progression comparison
+See `EC2_GUIDE.txt` for the full setup guide. Recommended instance: `c5.xlarge` (4 vCPUs, 8 GB RAM) on Ubuntu 24.04 LTS.
 
-## For More Details
-
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed documentation on:
-- Client selection strategies
-- FedProx algorithm implementation
-- Adaptive μ computation
-- Data flow and architecture
+```bash
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
