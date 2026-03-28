@@ -1,169 +1,138 @@
-# Federated Learning for Personal Finance Prediction
+# Federated Learning for Personal Finance Prediction (Flower)
 
-This project implements a **Federated Learning** system for predicting disposable income using the Indian Personal Finance dataset. It compares three federated learning strategies: **FedAvg**, **FedProx**, and **SmartFedProx** with adaptive μ and hybrid client selection.
+This project implements a **Federated Learning** system using the [Flower (flwr)](https://flower.ai) framework to predict disposable income from the Indian Personal Finance dataset. It compares three federated learning strategies: **FedAvg**, **FedProx**, and **SmartFedProx**.
 
 ## Project Structure
 
 ```
-FLRegression/
-├── dataset.py              # Dataset loading and preprocessing
-├── module.py               # Model definition, training functions, and configuration
-├── client.py               # SimulatedClient class for local training
-├── server.py               # FederatedSimulator class for orchestration
-├── main.py                 # Main entry point for running simulations
-├── run_comparison.py       # Comparison script for all three strategies
-├── README.md               # This file
-└── IMPLEMENTATION_PLAN.md  # Detailed implementation documentation
+FlowerImplementation/
+├── data/
+│   └── indianPersonalFinanceAndSpendingHabits.csv   # Dataset
+├── quickstart-pytorch/
+│   ├── pyproject.toml                               # Flower app config & dependencies
+│   └── pytorchexample/
+│       ├── __init__.py
+│       ├── task.py                                  # Model, data loading, train/test functions
+│       ├── client_app.py                            # Flower ClientApp (train + evaluate handlers)
+│       └── server_app.py                            # Flower ServerApp (FedAvg, FedProx, SmartFedProx)
+└── requirements.txt
 ```
 
 ## Dataset
 
-The dataset (`indianPersonalFinanceAndSpendingHabits.csv`) is located at:
-```
-/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv
-```
+**File:** `data/indianPersonalFinanceAndSpendingHabits.csv`
 
-**Target Variable:** `Disposable_Income` (regression task)
+**Target Variable:** `Disposable_Income` (regression — standardized during training)
 
-**Features:** Income, Age, Dependents, Rent, Loan_Repayment, Insurance, various spending categories, and potential savings.
+**Features:** Income, Age, Dependents, Rent, Loan_Repayment, Insurance, spending categories, and potential savings. Categorical columns (`Occupation`, `City_Tier`) are one-hot encoded.
 
-**Non-IID Partitioning:** The data is partitioned using extreme non-IID strategy:
-- Primary split by Occupation + City_Tier + Income_Bracket
-- Label skew: Some clients only see high/low disposable income samples
-- Quantity skew: Uneven data distribution across clients
+**Non-IID Partitioning:** Data is partitioned using a demographic key of `Occupation + City_Tier + Income_Bracket`. Keys are shuffled deterministically and assigned to clients via round-robin, producing realistic label and quantity skew across clients.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.10+
-- PyTorch
-- NumPy, Pandas, scikit-learn
-- Matplotlib
-
-### Install Dependencies
+Install dependencies from the app's `pyproject.toml` using pip:
 
 ```bash
-pip install -r requirements.txt
+cd quickstart-pytorch
+pip install -e .
 ```
 
-Or install manually:
-```bash
-pip install torch pandas scikit-learn numpy matplotlib fastapi uvicorn
-```
-
-## Running the Project
-
-### Run Main Simulation
-
-Run the main federated learning simulation comparing all three strategies:
+Or install the pinned dependencies manually:
 
 ```bash
-cd FLRegression
-python main.py
+pip install "flwr[simulation]>=1.20.0" "torch==2.2.2" "pandas>=2.0.0" "numpy<2" "matplotlib>=3.7.0"
 ```
 
-This will:
-- Run simulations for FedAvg, FedProx, and SmartFedProx
-- Generate comparison plots (R² score, MSE loss, training loss, divergence, effective μ)
-- Save results to `comparison_results.png`, `r2_comparison.png`, and `mse_comparison.png`
+## Running the Simulation
 
-### Run Comparison Script
-
-Run the detailed comparison script with multiple trials:
+All commands must be run from inside the `quickstart-pytorch/` directory:
 
 ```bash
-python run_comparison.py
+cd quickstart-pytorch
+flwr run .
 ```
 
-This runs multiple trials for statistical significance and generates comprehensive comparison plots.
-
-### Run FastAPI Web Interface
-
-Launch the API and web interface:
-
-```bash
-# Install FastAPI if not already installed
-pip install fastapi uvicorn
-
-# Run the FastAPI server
-uvicorn api:app --reload --port 8000
-```
-
-The API provides:
-- REST endpoints for running simulations and retrieving results
-- Interactive API docs at `http://localhost:8000/docs`
-- Static frontend at `http://localhost:8000`
-
-## Strategies Compared
-
-1. **FedAvg**: Baseline federated averaging (μ=0, random client selection)
-2. **FedProx**: FedProx with fixed μ=0.1 and random client selection
-3. **SmartFedProx**: FedProx with adaptive μ and hybrid client selection
+This launches a **local Flower simulation** with 12 supernodes (clients), runs all three strategies sequentially, and saves the output plots and model to the `quickstart-pytorch/` directory.
 
 ## Configuration
 
-Key configuration parameters are defined in `module.py`:
+All parameters are defined in `quickstart-pytorch/pyproject.toml` under `[tool.flwr.app.config]`:
 
-- `NUM_ROUNDS = 20`: Number of federated learning rounds
-- `NUM_CLIENTS = 10`: Number of clients
-- `FRACTION_FIT = 0.5`: Fraction of clients selected per round
-- `LOCAL_EPOCHS = 3`: Local training epochs per client
-- `LEARNING_RATE = 0.001`: Learning rate for Adam optimizer
-- `BATCH_SIZE = 64`: Batch size for training
+| Parameter | Default | Description |
+|---|---|---|
+| `num-server-rounds` | `10` | Number of federated rounds per strategy |
+| `fraction-evaluate` | `0.7` | Fraction of clients used for evaluation |
+| `local-epochs` | `3` | Local training epochs per client per round |
+| `learning-rate` | `0.001` | Adam optimizer learning rate |
+| `batch-size` | `64` | Batch size for local training |
+| `strategy` | `"compare"` | Runs all three strategies in sequence |
+| `smart-mu-init` | `0.1` | SmartFedProx: initial proximal coefficient μ |
+| `smart-mu-min` | `0.001` | SmartFedProx: minimum μ |
+| `smart-mu-max` | `1.0` | SmartFedProx: maximum μ |
+
+**Simulation resources** (`[tool.flwr.federations.local-simulation]`):
+- `num-supernodes = 12`
+- `num-cpus = 2` per client
 
 ## Model Architecture
 
-The model is a Multi-Layer Perceptron (MLP) for regression:
-- Input: 26 features (after preprocessing)
-- Hidden layers: 128 → 64 → 32 neurons
-- Output: 1 neuron (disposable income prediction)
-- Activation: ReLU with BatchNorm and Dropout
+Defined in `pytorchexample/task.py` as `Net` — a Multi-Layer Perceptron for regression:
 
-## Key Features
+```
+Input (input_dim features)
+  → Linear(128) → BatchNorm1d → ReLU → Dropout(0.3)
+  → Linear(64)  → BatchNorm1d → ReLU → Dropout(0.2)
+  → Linear(32)  → BatchNorm1d → ReLU
+  → Linear(1)   → scalar output (standardized disposable income)
+```
 
-- **Extreme Non-IID Data Partitioning**: Realistic heterogeneous data distribution
-- **Adaptive Proximal Coefficient (μ)**: Dynamically adjusts based on client divergence
-- **Hybrid Client Selection**: Balances high and low divergence clients for stability
-- **Comprehensive Metrics**: Tracks R² score, MSE loss, training loss, model divergence, and effective μ
+The actual `input_dim` is derived at runtime from the preprocessed dataset.
+
+## Strategies
+
+### FedAvg
+
+Standard federated averaging. No proximal term (`mu=0`). Clients are selected randomly each round.
+
+### FedProx
+
+FedProx with a **fixed** proximal coefficient `mu=0.1`. Adds a regularization term `(mu/2) * ||w - w_global||²` to the client loss to limit drift from the global model.
+
+### SmartFedProx
+
+An enhanced FedProx variant implemented as `SmartFedAvg` (a `FedAvg` subclass):
+
+- **Adaptive μ:** Per-node μ is computed each round based on that client's historical divergence relative to the global average divergence, scaled by local epochs. μ is further adjusted round-to-round based on whether test loss is improving.
+- **Balanced client selection:** Clients are ranked by divergence and selected with a 30% high / 50% mid / 20% low divergence split to balance stability and convergence.
+- **Boosted learning rate:** Peak LR is `1.5x` the base LR, held flat for the first 60% of rounds then decayed via cosine schedule.
+- **Adaptive local epochs:** Clients run `base_epochs + 1` when `mu >= 0.07`.
+- **Gradient clipping:** Gradients clipped to L2 norm of 5.0 to prevent non-IID gradient explosion.
+
+## Client & Server Apps
+
+**ClientApp** (`pytorchexample/client_app.py`):
+- `@app.train()`: Receives global model weights and config (including `mu`, `lr`, `epochs`, `grad_clip`) from the server. Trains locally, computes model divergence (L2 norm of param diff), and returns updated weights and metrics.
+- `@app.evaluate()`: Evaluates the global model on the client's local test split. Returns `eval_loss` (MSE) and `eval_r2` (R²).
+
+**ServerApp** (`pytorchexample/server_app.py`):
+- `@app.main()`: Orchestrates all three strategy runs sequentially. Each strategy gets a fresh model. Preloads centralized train/test dataloaders once and shares them across all evaluations.
+- Centralized evaluation is performed after each round using the last 20% of the dataset.
 
 ## Output Files
 
-After running simulations, the following files are generated:
+After running, the following files are saved in `quickstart-pytorch/`:
 
-- `comparison_results.png`: Comprehensive 6-panel comparison plot
-- `r2_comparison.png`: R² score progression comparison
-- `mse_comparison.png`: MSE loss progression comparison
+| File | Description |
+|---|---|
+| `comparison_results.png` | 6-panel plot: R², MSE (test), training loss, model divergence (L2), effective μ, and a final summary table |
+| `r2_score_comparison.png` | R² score progression per round for all three strategies |
+| `mse_loss_comparison.png` | MSE loss progression per round for all three strategies |
+| `final_model.pt` | Saved PyTorch state dict of the final SmartFedProx model |
 
-## CI/CD Pipeline
+## Metrics Tracked Per Round
 
-This project includes a comprehensive CI/CD pipeline using GitHub Actions:
-
-- **Automated Testing**: Runs on every push and pull request
-- **Code Quality Checks**: Linting with flake8, formatting checks with Black and isort
-- **Simulation Validation**: Quick and full simulation tests
-- **Multi-Python Support**: Tests on Python 3.10 and 3.11
-
-See [.github/workflows/README.md](../.github/workflows/README.md) for detailed CI/CD documentation.
-
-### Running Tests Locally
-
-```bash
-# Install test dependencies
-pip install -r requirements.txt
-pip install pytest pytest-cov flake8
-
-# Run all tests
-pytest tests/ -v
-
-# Run quick CI simulation
-./scripts/run_tests.sh
-```
-
-## For More Details
-
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed documentation on:
-- Client selection strategies
-- FedProx algorithm implementation
-- Adaptive μ computation
-- Data flow and architecture
+- **R² Score** — coefficient of determination on centralized test set
+- **MSE Loss** — mean squared error on centralized test set
+- **Training Loss** — MSE on centralized training set
+- **Model Divergence** — L2 norm of parameter change between rounds
+- **Effective μ** — proximal coefficient used (0 for FedAvg, 0.1 for FedProx, adaptive for SmartFedProx)
