@@ -1,0 +1,29 @@
+{
+  "os":  "macOS-26.3.1-x86_64-i386-64bit",
+  "python":  "CPython 3.10.18",
+  "startedAt":  "2026-03-28T07:42:10.914189Z",
+  "program":  "/Users/dinukaperera/FLRegressionFlwr/FLRegression/main.py",
+  "codePath":  "FLRegression/main.py",
+  "codePathLocal":  "main.py",
+  "git":  {
+    "remote":  "git@github.com:J3r3myPerera/FLRegressionFwr.git",
+    "commit":  "c1243845e69e915f375de508ee6fa491c84509c5"
+  },
+  "email":  "dinuka.20210433@iit.ac.lk",
+  "root":  "/Users/dinukaperera/FLRegressionFlwr/FLRegression",
+  "host":  "Dinukas-MacBook-Pro.local",
+  "executable":  "/Users/dinukaperera/opt/anaconda3/envs/flower_tutorial/bin/python",
+  "cpu_count":  10,
+  "cpu_count_logical":  10,
+  "disk":  {
+    "/":  {
+      "total":  "994662584320",
+      "used":  "601551966208"
+    }
+  },
+  "memory":  {
+    "total":  "17179869184"
+  },
+  "apple":  {},
+  "writerId":  "9074ce6kiymmiunzqkab3ggti9kothmm"
+}
