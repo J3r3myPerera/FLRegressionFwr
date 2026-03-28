@@ -1,6 +1,3 @@
-/* ================================================================
-   GLOBALS
-   ================================================================ */
 const COLORS = {
   FedAvg: "#e74c3c",
   FedProx: "#3498db",
@@ -17,9 +14,7 @@ const PLOT_LAYOUT = {
   hovermode: "x unified",
 };
 
-/* ================================================================
-   ON LOAD — fetch server config & populate strategy cards
-   ================================================================ */
+/* ON LOAD — fetch server config & populate strategy cards*/
 (async function init() {
   try {
     const resp = await fetch("/api/config");
@@ -50,15 +45,11 @@ const PLOT_LAYOUT = {
   }
 })();
 
-/* ================================================================
-   RUN SIMULATION
-   ================================================================ */
+/* RUN SIMULATION*/
 async function runSimulation() {
   const strategies = [];
-  if (document.getElementById("chkFedAvg").checked)
-    strategies.push("FedAvg");
-  if (document.getElementById("chkFedProx").checked)
-    strategies.push("FedProx");
+  if (document.getElementById("chkFedAvg").checked) strategies.push("FedAvg");
+  if (document.getElementById("chkFedProx").checked) strategies.push("FedProx");
   if (document.getElementById("chkSmartFedProx").checked)
     strategies.push("SmartFedProx");
   const validationError = document.getElementById("validationError");
@@ -75,9 +66,7 @@ async function runSimulation() {
     num_trials: parseInt(document.getElementById("numTrials").value),
     seed: parseInt(document.getElementById("seed").value),
     num_clients: parseInt(document.getElementById("numClients").value),
-    fraction_fit: parseFloat(
-      document.getElementById("fractionFit").value,
-    ),
+    fraction_fit: parseFloat(document.getElementById("fractionFit").value),
     local_epochs: parseInt(document.getElementById("localEpochs").value),
   };
 
@@ -104,16 +93,13 @@ async function runSimulation() {
     const data = await resp.json();
     renderResults(data.result);
   } catch (e) {
-    document.getElementById("statusText").textContent =
-      "Error: " + e.message;
+    document.getElementById("statusText").textContent = "Error: " + e.message;
   } finally {
     document.getElementById("btnRun").disabled = false;
   }
 }
 
-/* ================================================================
-   RESET
-   ================================================================ */
+/* RESET*/
 function resetUI() {
   document.getElementById("welcomeScreen").classList.remove("hidden");
   document.getElementById("resultsScreen").classList.add("hidden");
@@ -121,9 +107,7 @@ function resetUI() {
   document.getElementById("progressBar").style.width = "0%";
 }
 
-/* ================================================================
-   RENDER RESULTS
-   ================================================================ */
+/* RENDER RESULTS*/
 function renderResults(result) {
   document.getElementById("welcomeScreen").classList.add("hidden");
   document.getElementById("resultsScreen").classList.remove("hidden");
@@ -157,7 +141,9 @@ function renderResults(result) {
     .join(" &nbsp;·&nbsp; ");
   document.getElementById("winnerCard").innerHTML =
     `Best performing strategy: <strong>${winner}</strong> (Final R² = ${winnerR2.toFixed(4)})` +
-    (comparisons ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--muted)">${comparisons}</div>` : "");
+    (comparisons
+      ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--muted)">${comparisons}</div>`
+      : "");
 
   /* ---- comparison table ---- */
   const tHead = document.querySelector("#comparisonTable thead");
