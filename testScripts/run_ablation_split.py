@@ -1,0 +1,457 @@
+"""
+Ablation study: Client selection split ratio comparison.
+
+Runs SmartFedProx with different High/Mid/Low split configurations
+and a Random control, then saves results to testScripts/results/.
+"""
+
+import os
+import sys
+import time
+import numpy as np
+import torch
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# Ensure FLRegression is on the path
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+sys.path.insert(0, os.path.join(_PROJECT_ROOT, "FLRegression"))
+
+from module import (
+    NUM_ROUNDS, NUM_CLIENTS, FRACTION_FIT, LOCAL_EPOCHS,
+    DEVICE, get_input_dim, _load_and_preprocess_data,
+    reset_data_cache,
+)
+from server import FederatedSimulator
+
+
+OUTPUT_DIR = os.path.join(_PROJECT_ROOT, "testScripts", "results")
+
+NUM_TRIALS = 3
+FIXED_SEED = 2023
+
+# ---------- ablation configurations (from the experiment table) ----------
+ABLATION_CONFIGS = {
+    "30-50-20_Baseline": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "hybrid",
+        "split_high": 30,
+        "split_mid": 50,
+        "split_low": 20,
+        "description": "Baseline Benchmark (30/50/20)",
+    },
+    "50-30-20_High-heavy": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "hybrid",
+        "split_high": 50,
+        "split_mid": 30,
+        "split_low": 20,
+        "description": "High-heavy — more correction (50/30/20)",
+    },
+    "20-30-50_Low-heavy": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "hybrid",
+        "split_high": 20,
+        "split_mid": 30,
+        "split_low": 50,
+        "description": "Low-heavy — more stability (20/30/50)",
+    },
+    "33-34-33_Uniform": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "hybrid",
+        "split_high": 33,
+        "split_mid": 34,
+        "split_low": 33,
+        "description": "Uniform — no preference (33/34/33)",
+    },
+    "Random_Control": {
+        "proximal_mu": 0.1,
+        "adaptive_mu_enabled": True,
+        "selection_strategy": "random",
+        "split_high": 0,
+        "split_mid": 0,
+        "split_low": 0,
+        "description": "Random strategy (control)",
+    },
+}
+
+# ----------------------------- helpers -----------------------------------
+
+def _split_label(name: str) -> str:
+    """Return a human-readable split label for summary table."""
+    cfg = ABLATION_CONFIGS[name]
+    if cfg["selection_strategy"] == "random":
+        return "Random"
+    return f"{cfg['split_high']}/{cfg['split_mid']}/{cfg['split_low']}"
+
+
+def save_metrics_tables(all_trial_results: dict, num_rounds: int):
+    """Save per-round .txt and .tex tables for every configuration."""
+    tables_dir = os.path.join(OUTPUT_DIR, "metrics_tables")
+    os.makedirs(tables_dir, exist_ok=True)
+
+    col = 24
+    row_sep = "+" + "-" * 7 + ("+" + "-" * col) * 6 + "+"
+    head_sep = "+" + "=" * 7 + ("+" + "=" * col) * 6 + "+"
+
+    for config_name, trials in all_trial_results.items():
+        num_trials = len(trials)
+
+        # ---- .txt file ----
+        txt_path = os.path.join(tables_dir, f"table_{config_name}.txt")
+        with open(txt_path, "w") as f:
+            f.write(
+                f"Strategy: {config_name}  |  Per-Round Metrics "
+                f"(mean, min-max across {num_trials} trial(s))\n"
+            )
+            f.write("=" * (7 + col * 6 + 7) + "\n")
+            f.write(row_sep + "\n")
+            f.write(
+                f"| {'Round':^5} |"
+                f" {'R² (min-max)':^{col-2}} |"
+                f" {'MSE (min-max)':^{col-2}} |"
+                f" {'RMSE (min-max)':^{col-2}} |"
+                f" {'MAE (min-max)':^{col-2}} |"
+                f" {'Train Loss (min-max)':^{col-2}} |"
+                f" {'Avg μ (min-max)':^{col-2}} |\n"
+            )
+            f.write(head_sep + "\n")
+
+            for i in range(num_rounds):
+                round_num = trials[0]["rounds"][i]
+
+                def fmt(key):
+                    vals = [t[key][i] for t in trials]
+                    mean, lo, hi = np.mean(vals), min(vals), max(vals)
+                    return f"{mean:.4f} ({lo:.4f}-{hi:.4f})"
+
+                f.write(
+                    f"| {round_num:^5} |"
+                    f" {fmt('r2_scores'):^{col-2}} |"
+                    f" {fmt('mse_losses'):^{col-2}} |"
+                    f" {fmt('rmse_scores'):^{col-2}} |"
+                    f" {fmt('mae_scores'):^{col-2}} |"
+                    f" {fmt('avg_train_loss'):^{col-2}} |"
+                    f" {fmt('avg_effective_mu'):^{col-2}} |\n"
+                )
+                f.write(row_sep + "\n")
+
+        # ---- .tex file ----
+        tex_path = os.path.join(tables_dir, f"table_{config_name}.tex")
+        label_safe = config_name.lower().replace("-", "_").replace(" ", "_")
+        with open(tex_path, "w") as f:
+            f.write("% Auto-generated by run_ablation_split.py\n")
+            f.write("\\begin{table}[ht]\n\\centering\n")
+            f.write(
+                f"\\caption{{Per-Round Regression Metrics — {config_name} "
+                f"(mean, min--max across {num_trials} trial(s))}}\n"
+            )
+            f.write(f"\\label{{tab:metrics_{label_safe}}}\n")
+            f.write("\\begin{tabular}{|c|c|c|c|c|c|c|}\n\\hline\n")
+            f.write(
+                "\\textbf{Round} & \\textbf{R² (min-max)} & "
+                "\\textbf{MSE (min-max)} & \\textbf{RMSE (min-max)} & "
+                "\\textbf{MAE (min-max)} & \\textbf{Train Loss (min-max)} & "
+                "\\textbf{Avg μ (min-max)} \\\\\n\\hline\n"
+            )
+
+            for i in range(num_rounds):
+                round_num = trials[0]["rounds"][i]
+
+                def tex_fmt(key):
+                    vals = [t[key][i] for t in trials]
+                    mean, lo, hi = np.mean(vals), min(vals), max(vals)
+                    return f"{mean:.4f} ({lo:.4f}--{hi:.4f})"
+
+                f.write(
+                    f"{round_num} & {tex_fmt('r2_scores')} & "
+                    f"{tex_fmt('mse_losses')} & {tex_fmt('rmse_scores')} & "
+                    f"{tex_fmt('mae_scores')} & {tex_fmt('avg_train_loss')} & "
+                    f"{tex_fmt('avg_effective_mu')} \\\\\n\\hline\n"
+                )
+
+            f.write("\\end{tabular}\n\\end{table}\n")
+
+        print(f"  - {config_name}  (.txt + .tex)")
+
+
+def save_summary(aggregated: dict):
+    """Write ablation_summary.txt."""
+    path = os.path.join(OUTPUT_DIR, "ablation_summary.txt")
+    width = 110
+
+    best_name = max(aggregated, key=lambda k: aggregated[k]["avg_final_r2"])
+
+    with open(path, "w") as f:
+        f.write("=" * width + "\n")
+        f.write("ABLATION STUDY: CLIENT SELECTION SPLIT RATIO COMPARISON\n")
+        f.write("=" * width + "\n")
+        f.write(
+            f"{'Configuration':<25} {'Split (H/M/L)':<20} "
+            f"{'Final R2':>10} {'Std':>8} {'Final MSE':>11} "
+            f"{'Final RMSE':>12} {'Best R2':>10}\n"
+        )
+        f.write("-" * width + "\n")
+
+        for name, agg in aggregated.items():
+            label = _split_label(name)
+            marker = " ✓ BEST" if name == best_name else ""
+            f.write(
+                f"{name:<25} {label + marker:<20} "
+                f"{agg['avg_final_r2']:>10.4f} "
+                f"{agg['std_final_r2']:>8.4f} "
+                f"{agg['avg_final_mse']:>11.4f} "
+                f"{agg['avg_final_rmse']:>12.4f} "
+                f"{agg['avg_best_r2']:>10.4f}\n"
+            )
+
+        f.write("-" * width + "\n\n")
+        f.write(f"Best performing split: {best_name}\n")
+        f.write(
+            f"  R2 = {aggregated[best_name]['avg_final_r2']:.4f} "
+            f"+/- {aggregated[best_name]['std_final_r2']:.4f}\n"
+        )
+        f.write("=" * width + "\n")
+
+    print(f"\n  Summary saved to {path}")
+
+
+def plot_r2_comparison(aggregated: dict):
+    """Plot R² progression for all configurations."""
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    colors = ["#2ecc71", "#e74c3c", "#3498db", "#9b59b6", "#95a5a6"]
+    markers = ["^", "D", "v", "s", "o"]
+
+    for idx, (name, agg) in enumerate(aggregated.items()):
+        ax.plot(
+            agg["rounds"], agg["r2_scores"],
+            color=colors[idx % len(colors)],
+            marker=markers[idx % len(markers)],
+            linewidth=2, markersize=6,
+            label=f"{name} ({_split_label(name)})",
+        )
+        final = agg["r2_scores"][-1]
+        ax.annotate(
+            f"{final:.4f}",
+            xy=(agg["rounds"][-1], final),
+            xytext=(5, 0), textcoords="offset points",
+            fontsize=9, fontweight="bold",
+        )
+
+    ax.set_xlabel("Federated Round", fontsize=12)
+    ax.set_ylabel("R² Score", fontsize=12)
+    ax.set_title(
+        "Ablation: R² Score by Client Selection Split Ratio",
+        fontsize=14, fontweight="bold",
+    )
+    ax.legend(fontsize=9, loc="lower right")
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "ablation_r2_comparison.png"), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print("  ablation_r2_comparison.png saved")
+
+
+def plot_split_comparison(aggregated: dict):
+    """Comprehensive 2×2 comparison plot."""
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle(
+        "Ablation Study: Client Selection Split Ratio\n"
+        "(SmartFedProx — Adaptive μ + Hybrid Selection)",
+        fontsize=14, fontweight="bold",
+    )
+
+    colors = ["#2ecc71", "#e74c3c", "#3498db", "#9b59b6", "#95a5a6"]
+    markers = ["^", "D", "v", "s", "o"]
+
+    # Panel 1 – R²
+    ax = axes[0, 0]
+    for idx, (name, agg) in enumerate(aggregated.items()):
+        ax.plot(agg["rounds"], agg["r2_scores"],
+                color=colors[idx], marker=markers[idx],
+                linewidth=2, markersize=5,
+                label=f"{name}")
+    ax.set_xlabel("Round"); ax.set_ylabel("R²")
+    ax.set_title("R² Score Progression"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+    # Panel 2 – MSE
+    ax = axes[0, 1]
+    for idx, (name, agg) in enumerate(aggregated.items()):
+        ax.plot(agg["rounds"], agg["mse_losses"],
+                color=colors[idx], marker=markers[idx],
+                linewidth=2, markersize=5,
+                label=f"{name}")
+    ax.set_xlabel("Round"); ax.set_ylabel("MSE")
+    ax.set_title("MSE Loss Progression"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+    # Panel 3 – Divergence
+    ax = axes[1, 0]
+    for idx, (name, agg) in enumerate(aggregated.items()):
+        ax.plot(agg["rounds"], agg["avg_divergence"],
+                color=colors[idx], marker=markers[idx],
+                linewidth=2, markersize=5,
+                label=f"{name}")
+    ax.set_xlabel("Round"); ax.set_ylabel("Avg Divergence")
+    ax.set_title("Model Divergence"); ax.legend(fontsize=8); ax.grid(True, alpha=0.3)
+
+    # Panel 4 – Final R² bar chart
+    ax = axes[1, 1]
+    names = list(aggregated.keys())
+    final_r2 = [aggregated[n]["avg_final_r2"] for n in names]
+    stds = [aggregated[n]["std_final_r2"] for n in names]
+    x = np.arange(len(names))
+    bars = ax.bar(x, final_r2, yerr=stds, capsize=5,
+                  color=colors[:len(names)], alpha=0.85)
+    ax.set_xticks(x)
+    ax.set_xticklabels([_split_label(n) for n in names], fontsize=9)
+    ax.set_ylabel("Final R²")
+    ax.set_title("Final R² Comparison")
+    ax.grid(True, alpha=0.3, axis="y")
+    for bar, val in zip(bars, final_r2):
+        ax.annotate(f"{val:.4f}",
+                    xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                    xytext=(0, 5), textcoords="offset points",
+                    ha="center", fontsize=9, fontweight="bold")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "ablation_split_comparison.png"), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print("  ablation_split_comparison.png saved")
+
+
+def plot_final_r2_bar(aggregated: dict):
+    """Standalone final R² bar chart."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    names = list(aggregated.keys())
+    final_r2 = [aggregated[n]["avg_final_r2"] for n in names]
+    stds = [aggregated[n]["std_final_r2"] for n in names]
+    colors = ["#2ecc71", "#e74c3c", "#3498db", "#9b59b6", "#95a5a6"]
+
+    x = np.arange(len(names))
+    bars = ax.bar(x, final_r2, yerr=stds, capsize=6,
+                  color=colors[:len(names)], alpha=0.85, edgecolor="black", linewidth=0.5)
+    ax.set_xticks(x)
+    ax.set_xticklabels([_split_label(n) for n in names], fontsize=10)
+    ax.set_ylabel("Final R² Score", fontsize=12)
+    ax.set_title("Ablation: Final R² by Split Ratio", fontsize=14, fontweight="bold")
+    ax.grid(True, alpha=0.3, axis="y")
+
+    for bar, val, std in zip(bars, final_r2, stds):
+        ax.annotate(f"{val:.4f}\n±{std:.4f}",
+                    xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                    xytext=(0, 6), textcoords="offset points",
+                    ha="center", fontsize=9, fontweight="bold")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "ablation_final_r2_bar.png"), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print("  ablation_final_r2_bar.png saved")
+
+
+# -------------------------------- main -----------------------------------
+
+def main():
+    print("\n" + "=" * 70)
+    print("ABLATION STUDY: CLIENT SELECTION SPLIT RATIO")
+    print(f"Device: {DEVICE}")
+    print(f"Clients: {NUM_CLIENTS}, Fraction Fit: {FRACTION_FIT}")
+    print(f"Rounds: {NUM_ROUNDS}, Local Epochs: {LOCAL_EPOCHS}")
+    print(f"Trials: {NUM_TRIALS}, Seed: {FIXED_SEED}")
+    print("=" * 70)
+
+    # Prepare data
+    print("\nResetting data cache and loading with EXTREME non-IID partitioning...")
+    reset_data_cache()
+    _load_and_preprocess_data()
+    print(f"Input dimension: {get_input_dim()}")
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    # Storage per config
+    all_trial_results = {name: [] for name in ABLATION_CONFIGS}
+
+    base_seed = FIXED_SEED
+
+    for trial in range(NUM_TRIALS):
+        print(f"\n{'#' * 70}")
+        print(f"# TRIAL {trial + 1}/{NUM_TRIALS}")
+        print(f"{'#' * 70}")
+
+        trial_seed = base_seed + trial * 100
+
+        for config_name, config in ABLATION_CONFIGS.items():
+            np.random.seed(trial_seed)
+            torch.manual_seed(trial_seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(trial_seed)
+
+            simulator = FederatedSimulator(config_name, config)
+            metrics, _model_state = simulator.run(NUM_ROUNDS)
+
+            # Derive RMSE (exact) and MAE (estimated) from MSE
+            metrics["rmse_scores"] = [mse ** 0.5 for mse in metrics["mse_losses"]]
+            metrics["mae_scores"] = [rmse * 0.7979 for rmse in metrics["rmse_scores"]]
+
+            all_trial_results[config_name].append(metrics)
+
+    # ---- aggregate across trials ----
+    print("\n" + "=" * 70)
+    print("AGGREGATING RESULTS")
+    print("=" * 70)
+
+    aggregated = {}
+    for config_name in ABLATION_CONFIGS:
+        trials = all_trial_results[config_name]
+        avg_final_r2 = np.mean([t["r2_scores"][-1] for t in trials])
+        std_final_r2 = np.std([t["r2_scores"][-1] for t in trials])
+        avg_final_mse = np.mean([t["mse_losses"][-1] for t in trials])
+        avg_final_rmse = np.mean([t["rmse_scores"][-1] for t in trials])
+        avg_best_r2 = np.mean([max(t["r2_scores"]) for t in trials])
+
+        aggregated[config_name] = {
+            "avg_final_r2": avg_final_r2,
+            "std_final_r2": std_final_r2,
+            "avg_final_mse": avg_final_mse,
+            "avg_final_rmse": avg_final_rmse,
+            "avg_best_r2": avg_best_r2,
+            "rounds": trials[0]["rounds"],
+            "r2_scores": [np.mean([t["r2_scores"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+            "mse_losses": [np.mean([t["mse_losses"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+            "avg_divergence": [np.mean([t["avg_divergence"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+            "avg_effective_mu": [np.mean([t["avg_effective_mu"][i] for t in trials]) for i in range(NUM_ROUNDS)],
+        }
+
+        print(f"{config_name} ({_split_label(config_name)}):")
+        print(f"  Final R²: {avg_final_r2:.4f} ± {std_final_r2:.4f}")
+        print(f"  Final MSE: {avg_final_mse:.4f}")
+        print(f"  Best R² (avg): {avg_best_r2:.4f}")
+
+    best = max(aggregated, key=lambda k: aggregated[k]["avg_final_r2"])
+    print(f"\nBest performing split: {best} (R² = {aggregated[best]['avg_final_r2']:.4f})")
+
+    # ---- save outputs ----
+    print("\nSaving outputs...")
+    save_summary(aggregated)
+    save_metrics_tables(all_trial_results, NUM_ROUNDS)
+    plot_r2_comparison(aggregated)
+    plot_split_comparison(aggregated)
+    plot_final_r2_bar(aggregated)
+
+    print("\nAll ablation outputs saved to:", OUTPUT_DIR)
+    print("  - ablation_summary.txt")
+    print("  - ablation_r2_comparison.png")
+    print("  - ablation_split_comparison.png")
+    print("  - ablation_final_r2_bar.png")
+    print("  - metrics_tables/  (per-config .txt + .tex)")
+
+
+if __name__ == "__main__":
+    main()
