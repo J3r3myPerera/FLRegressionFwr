@@ -1,8 +1,3 @@
-#Strategies compared:
-#1. FedAvg: Random client selection
-#2. FedProx: Proximal term (μ=0.1), random client selection  
-#3. SmartFedProx: Proximal term (μ=0.1), hybrid client selection with adaptive μ
-
 import os
 import time
 import numpy as np

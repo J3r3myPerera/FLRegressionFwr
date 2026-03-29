@@ -1,4 +1,3 @@
-#Server
 import torch
 import numpy as np
 import wandb
@@ -21,7 +20,6 @@ class FederatedSimulator:
             self.clients.append(SimulatedClient(i, NUM_CLIENTS, BATCH_SIZE))
     
     def select_clients(self, round_num: int) -> list:
-        """Select clients based on strategy."""
         num_to_select = max(2, int(NUM_CLIENTS * FRACTION_FIT))
         
         if self.config["selection_strategy"] == "random":

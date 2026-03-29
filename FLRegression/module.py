@@ -1,8 +1,3 @@
-
-#Shared configuration and constants for federated learning simulation.
-#Contains model definition and training code.
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -111,14 +106,14 @@ def compute_adaptive_mu(
 
 
 def train(net, trainloader, epochs, lr, device, proximal_mu=0.0, adaptive_mu_config=None):
-    #Train the model on the training set using FedProx with optional adaptive μ.
-    net.to(device)  # move model to GPU if available
+    #Train the model on the training set 
+    net.to(device)
     net.train()
 
-    # Store global model parameters for proximal term (before training)
+    # Store global model parameters for proximal term before training
     global_params = [p.clone().detach().to(device) for p in net.parameters()]
 
-    # Compute adaptive μ if enabled (using historical data, not pre-training divergence)
+    # Compute adaptive μ if enabled using historical data
     effective_mu = proximal_mu
     if adaptive_mu_config and adaptive_mu_config.get("enabled", False):
         effective_mu = compute_adaptive_mu(
