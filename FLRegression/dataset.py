@@ -8,9 +8,9 @@ from pathlib import Path
 
 # Data Configuration
 TARGET_COLUMN = "Disposable_Income"
-PARTITION_COLUMN = "City_Tier"  # Non-IID partitioning by city tier
+PARTITION_COLUMN = "City_Tier"
 
-# Feature columns (excluding target and partition column from features)
+# Feature columns 
 CATEGORICAL_COLUMNS = ["Occupation", "City_Tier"]
 NUMERICAL_COLUMNS = [
     "Income", "Age", "Dependents", "Rent", "Loan_Repayment", "Insurance",
@@ -28,7 +28,6 @@ _preprocessors = None
 
 # Data Loading and Preprocessing
 def reset_data_cache():
-    """Reset the data cache to force reloading."""
     global _data_cache, _preprocessors
     _data_cache = None
     _preprocessors = None
@@ -47,9 +46,8 @@ def _get_data_path():
     if relative_path.exists():
         return relative_path
     
-    # Fallback to absolute path (for local development)
+    # For local developement
     return Path("/Users/dinukaperera/FLRegressionFlwr/data/indianPersonalFinanceAndSpendingHabits.csv")
-
 
 def _load_and_preprocess_data():
     """Load and preprocess the entire dataset once."""
@@ -91,7 +89,6 @@ def _load_and_preprocess_data():
     incomes = df["Income"].values
     
     # Create combined partition key: Occupation + City_Tier + Income_Bracket
-    # 12+ unique groups for more heterogeneity
     income_brackets = pd.qcut(incomes, q=3, labels=["Low", "Medium", "High"]).astype(str)
     combined_keys = np.array([f"{o}_{c}_{i}" for o, c, i in zip(occupations, city_tiers, income_brackets)])
     
@@ -106,7 +103,7 @@ def _load_and_preprocess_data():
     _data_cache = {
         "X": X_scaled,
         "y": y_scaled,
-        "y_raw": df[TARGET_COLUMN].values,  # For income-based skew
+        "y_raw": df[TARGET_COLUMN].values,
         "city_tiers": city_tiers,
         "occupations": occupations,
         "incomes": incomes,
@@ -125,9 +122,7 @@ def get_input_dim():
 
 
 def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Load partition of Personal Finance data with EXTREME non-IID partitioning.
-    
-    Non-IID Strategy:
+    """Non-IID Strategy:
     1. Primary split by Occupation + City_Tier + Income_Bracket (36 possible groups)
     2. Label skew: Some clients only see high/low disposable income samples
     3. Quantity skew: Uneven data distribution across clients
@@ -145,7 +140,6 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
     np.random.seed(42 + partition_id)  # Reproducible but different per client
     
     # Strategy 1: Assign clients to specific combined keys (Occupation+City+Income)
-    # Each client primarily gets data from 1-2 specific demographic groups
     num_keys = len(unique_keys)
     
     # Determine which keys this client primarily handles
@@ -179,7 +173,6 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
         secondary_indices = secondary_indices[income_mask_secondary]
     
     # Strategy 3: Quantity skew - uneven data distribution
-    # Some clients get more data, some get less
     quantity_factor = 0.5 + (partition_id % 5) * 0.2  # Ranges from 0.5 to 1.3
     
     # Sample from primary (70%) and secondary (30%) with quantity skew

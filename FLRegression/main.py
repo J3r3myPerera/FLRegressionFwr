@@ -1,9 +1,4 @@
-#Strategies compared:
-#1. FedAvg: Random client selection
-#2. FedProx: Proximal term (μ=0.1), random client selection  
-#3. SmartFedProx: Proximal term (μ=0.1), hybrid client selection with adaptive μ
-
-
+import os
 import time
 import numpy as np
 import torch
@@ -20,9 +15,11 @@ from module import (
 from server import FederatedSimulator
 
 
-def plot_comparison(all_results: dict, save_path: str = "comparison_results.png"):
+def plot_comparison(all_results: dict, save_path: str = "resultOutput/comparison_results.png"):
     """Create comprehensive comparison plots."""
     
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     fig.suptitle("Federated Learning Strategy Comparison\n(Personal Finance - Disposable Income Prediction)", 
                  fontsize=14, fontweight='bold')
@@ -149,9 +146,9 @@ def save_individual_plots(all_results: dict, colors: dict, markers: dict):
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("r2_comparison.png", dpi=150, bbox_inches='tight')
+    plt.savefig("resultOutput/r2_comparison.png", dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print("R² comparison plot saved to 'r2_comparison.png'")
+    print("R² comparison plot saved to 'resultOutput/r2_comparison.png'")
     
     # MSE Loss only
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -166,9 +163,9 @@ def save_individual_plots(all_results: dict, colors: dict, markers: dict):
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("mse_comparison.png", dpi=150, bbox_inches='tight')
+    plt.savefig("resultOutput/mse_comparison.png", dpi=150, bbox_inches='tight')
     plt.close(fig)
-    print("MSE comparison plot saved to 'mse_comparison.png'")
+    print("MSE comparison plot saved to 'resultOutput/mse_comparison.png'")
 
 
 def print_summary(all_results: dict):
@@ -215,8 +212,9 @@ def main():
     _load_and_preprocess_data()
     print(f"Input dimension: {get_input_dim()}")
     
-    # Storage for all trial results
+    # Storage for all trial results  and final models
     all_trial_results = {name: [] for name in STRATEGIES.keys()}
+    final_models = {}
     
    
     if FIXED_SEED is not None:
@@ -259,8 +257,9 @@ def main():
             )
 
             simulator = FederatedSimulator(strategy_name, config)
-            metrics = simulator.run(NUM_ROUNDS)
+            metrics, model_state = simulator.run(NUM_ROUNDS)
             all_trial_results[strategy_name].append(metrics)
+            final_models[strategy_name] = model_state
 
             wandb.finish()
     
@@ -317,12 +316,21 @@ def main():
     # Generate plots with averaged results
     print("\nGenerating comparison plots (averaged across trials)...")
     plot_comparison(aggregated_results)
+
+    # Save final models
+    os.makedirs("resultOutput", exist_ok=True)
+    for strategy_name, model_state in final_models.items():
+        model_path = f"resultOutput/{strategy_name}_final_model.pt"
+        torch.save(model_state, model_path)
+        print(f"Model saved to '{model_path}'")
     
     print("\n All simulations complete!")
-    print("Generated files:")
-    print("  - comparison_results.png (comprehensive comparison)")
-    print("  - r2_comparison.png (R² score only)")
-    print("  - mse_comparison.png (MSE loss only)")
+    print("Generated files (in resultOutput/):")
+    print("  - resultOutput/comparison_results.png (comprehensive comparison)")
+    print("  - resultOutput/r2_comparison.png (R² score only)")
+    print("  - resultOutput/mse_comparison.png (MSE loss only)")
+    for strategy_name in STRATEGIES.keys():
+        print(f"  - resultOutput/{strategy_name}_final_model.pt (final model)")
 
 
 if __name__ == "__main__":

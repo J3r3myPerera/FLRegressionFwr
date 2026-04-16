@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quickstart-pytorch"
+version = "2.0.0"
+description = "Federated Learning for Personal Finance Prediction with Flower"
+license = "Apache-2.0"
+dependencies = [
+    "flwr[simulation]>=1.20.0",
+    "torch==2.2.2",
+    "pandas>=2.0.0",
+    "numpy<2",
+    "matplotlib>=3.7.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+[tool.flwr.app.components]
+serverapp = "pytorchexample.server_app:app"
+clientapp = "pytorchexample.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 10
+fraction-evaluate = 0.7
+local-epochs = 3
+learning-rate = 0.001
+batch-size = 64
+strategy = "compare"
+smart-mu-init = 0.1
+smart-mu-min = 0.001
+smart-mu-max = 1.0
+
+[tool.flwr.federations]
+default = "local-simulation"
+
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 12
+options.backend.client-resources.num-cpus = 2
+options.backend.client-resources.num-gpus = 0.0

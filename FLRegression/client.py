@@ -1,5 +1,3 @@
-#Client
-
 import torch
 from module import Net, get_input_dim, load_data, train, test, DEVICE
 

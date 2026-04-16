@@ -1,10 +1,3 @@
-"""
-FastAPI backend for Federated Learning Regression simulation.
-
-Run with:
-    uvicorn api:app --reload --port 8000
-"""
-
 import os
 import sys
 import time
@@ -15,6 +8,7 @@ from contextlib import asynccontextmanager
 
 import numpy as np
 import torch
+import wandb
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -144,9 +138,26 @@ def _run_simulation_inner(req: SimulationRequest) -> dict:
                 torch.cuda.manual_seed_all(trial_seed)
 
             config = STRATEGIES[strategy_name]
+            os.environ["WANDB_SYNC_INTERVAL"] = "1"
+            wandb.init(
+                entity="dinuka-20210433-university-of-westminster",
+                project="fl-regression",
+                group=strategy_name,
+                name=f"{strategy_name}_trial_{trial + 1}",
+                config={
+                    "strategy": strategy_name,
+                    "num_rounds": req.num_rounds,
+                    "num_clients": req.num_clients,
+                    "fraction_fit": req.fraction_fit,
+                    "local_epochs": req.local_epochs,
+                    **config,
+                },
+                reinit="finish_previous",
+            )
             simulator = FederatedSimulator(strategy_name, config)
-            metrics = simulator.run(req.num_rounds)
+            metrics, _ = simulator.run(req.num_rounds)
             all_trial_results[strategy_name].append(metrics)
+            wandb.finish()
 
     # Aggregate across trials
     aggregated: dict = {}
