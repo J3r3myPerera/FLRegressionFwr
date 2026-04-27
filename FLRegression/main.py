@@ -7,6 +7,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import wandb
 
+USE_WANDB = True
 from module import (
     NUM_ROUNDS, NUM_CLIENTS, FRACTION_FIT, LOCAL_EPOCHS, 
     DEVICE, STRATEGIES, get_input_dim, _load_and_preprocess_data, 
@@ -240,28 +241,30 @@ def main():
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(trial_seed)
 
-            wandb.init(
-                entity="dinuka-20210433-university-of-westminster",
-                project="fl-regression",
-                group=strategy_name,
-                name=f"{strategy_name}_trial_{trial + 1}",
-                config={
-                    "strategy": strategy_name,
-                    "num_rounds": NUM_ROUNDS,
-                    "num_clients": NUM_CLIENTS,
-                    "fraction_fit": FRACTION_FIT,
-                    "local_epochs": LOCAL_EPOCHS,
-                    **config,
-                },
-                reinit="finish_previous",
-            )
+            if USE_WANDB:
+                wandb.init(
+                    entity="dinuka-20210433-university-of-westminster",
+                    project="fl-regression",
+                    group=strategy_name,
+                    name=f"{strategy_name}_trial_{trial + 1}",
+                    config={
+                        "strategy": strategy_name,
+                        "num_rounds": NUM_ROUNDS,
+                        "num_clients": NUM_CLIENTS,
+                        "fraction_fit": FRACTION_FIT,
+                        "local_epochs": LOCAL_EPOCHS,
+                        **config,
+                    },
+                    reinit="finish_previous",
+                )
 
             simulator = FederatedSimulator(strategy_name, config)
             metrics, model_state = simulator.run(NUM_ROUNDS)
             all_trial_results[strategy_name].append(metrics)
             final_models[strategy_name] = model_state
 
-            wandb.finish()
+            if USE_WANDB:
+                wandb.finish()
     
     # Aggregate results across trials
     print("\n" + "="*70)
