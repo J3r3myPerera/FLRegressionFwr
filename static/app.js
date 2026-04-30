@@ -68,6 +68,7 @@ async function runSimulation() {
     num_clients: parseInt(document.getElementById("numClients").value),
     fraction_fit: parseFloat(document.getElementById("fractionFit").value),
     local_epochs: parseInt(document.getElementById("localEpochs").value),
+    use_wandb: document.getElementById("useWandb").checked,
   };
 
   document.getElementById("btnRun").disabled = true;
@@ -142,7 +143,7 @@ function renderResults(result) {
   document.getElementById("winnerCard").innerHTML =
     `Best performing strategy: <strong>${winner}</strong> (Final R² = ${winnerR2.toFixed(4)})` +
     (comparisons
-      ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--muted)">${comparisons}</div>`
+      ? `<div class="winner-comparisons">${comparisons}</div>`
       : "");
 
   /* ---- comparison table ---- */

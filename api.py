@@ -79,6 +79,7 @@ class SimulationRequest(BaseModel):
     local_epochs: int = Field(default=LOCAL_EPOCHS, ge=1, le=20)
     learning_rate: float = Field(default=LEARNING_RATE, ge=0.00001, le=0.1)
     batch_size: int = Field(default=BATCH_SIZE, ge=8, le=512)
+    use_wandb: bool = Field(default=True, description="Enable WandB real-time plotting")
 
 
 class StrategyInfo(BaseModel):
@@ -138,26 +139,28 @@ def _run_simulation_inner(req: SimulationRequest) -> dict:
                 torch.cuda.manual_seed_all(trial_seed)
 
             config = STRATEGIES[strategy_name]
-            os.environ["WANDB_SYNC_INTERVAL"] = "1"
-            wandb.init(
-                entity="dinuka-20210433-university-of-westminster",
-                project="fl-regression",
-                group=strategy_name,
-                name=f"{strategy_name}_trial_{trial + 1}",
-                config={
-                    "strategy": strategy_name,
-                    "num_rounds": req.num_rounds,
-                    "num_clients": req.num_clients,
-                    "fraction_fit": req.fraction_fit,
-                    "local_epochs": req.local_epochs,
-                    **config,
-                },
-                reinit="finish_previous",
-            )
+            if req.use_wandb:
+                os.environ["WANDB_SYNC_INTERVAL"] = "1"
+                wandb.init(
+                    entity="dinuka-20210433-university-of-westminster",
+                    project="fl-regression",
+                    group=strategy_name,
+                    name=f"{strategy_name}_trial_{trial + 1}",
+                    config={
+                        "strategy": strategy_name,
+                        "num_rounds": req.num_rounds,
+                        "num_clients": req.num_clients,
+                        "fraction_fit": req.fraction_fit,
+                        "local_epochs": req.local_epochs,
+                        **config,
+                    },
+                    reinit="finish_previous",
+                )
             simulator = FederatedSimulator(strategy_name, config)
             metrics, _ = simulator.run(req.num_rounds)
             all_trial_results[strategy_name].append(metrics)
-            wandb.finish()
+            if req.use_wandb:
+                wandb.finish()
 
     # Aggregate across trials
     aggregated: dict = {}
