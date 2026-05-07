@@ -105,6 +105,12 @@ Saved to `FLRegression/resultOutput/` (gitignored):
 
 Each strategy run across each trial is logged to WandB under project `fl-regression`. Metrics logged per round: R² score, MSE loss, training loss, model divergence, and effective μ.
 
+WandB logging can be disabled without modifying any other code by setting the flag at the top of `FLRegression/main.py`:
+
+```python
+USE_WANDB = False  # set to True to enable WandB logging
+```
+
 ---
 
 ## FlowerImplementation — Flower Framework
@@ -174,7 +180,9 @@ Open `http://localhost:8000` in your browser.
 | `/api/results/{run_id}` | GET | Fetch results for a run |
 | `/docs` | GET | Interactive OpenAPI docs |
 
-The dashboard provides a dark-themed UI with real-time Plotly charts for R², MSE, training loss, divergence, and μ across all three strategies.
+The `/api/simulate` endpoint accepts a `use_wandb` boolean field (default `true`) to control whether WandB is used for that run.
+
+The dashboard provides a dark-themed UI with real-time Plotly charts for R², MSE, training loss, divergence, and μ across all three strategies. Strategy selection uses toggle switches (ON/OFF), and a dedicated **WandB Real-Time Plotting** toggle lets you enable or disable WandB logging directly from the UI without restarting the server.
 
 ---
 
