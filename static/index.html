@@ -9,7 +9,7 @@
   </head>
   <body>
     <header>
-      <h1>Federated Learning Regression</h1>
+      <h1><span>Federated Learning</span> Regression</h1>
       <p>Disposable Income Prediction</p>
     </header>
 
@@ -56,20 +56,39 @@
 
           <div class="form-group">
             <label>Strategies</label>
-            <div class="checkbox-group">
-              <input type="checkbox" id="chkFedAvg" checked />
+            <div class="strategy-toggle-row">
               <span class="strategy-dot" style="background: #e74c3c"></span>
-              <label for="chkFedAvg">FedAvg</label>
+              <span class="strategy-name">FedAvg</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkFedAvg" checked />
+                <span class="toggle-slider" data-on="ON" data-off="OFF"></span>
+              </label>
             </div>
-            <div class="checkbox-group">
-              <input type="checkbox" id="chkFedProx" checked />
+            <div class="strategy-toggle-row">
               <span class="strategy-dot" style="background: #3498db"></span>
-              <label for="chkFedProx">FedProx</label>
+              <span class="strategy-name">FedProx</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkFedProx" checked />
+                <span class="toggle-slider" data-on="ON" data-off="OFF"></span>
+              </label>
             </div>
-            <div class="checkbox-group">
-              <input type="checkbox" id="chkSmartFedProx" checked />
+            <div class="strategy-toggle-row">
               <span class="strategy-dot" style="background: #2ecc71"></span>
-              <label for="chkSmartFedProx">SmartFedProx</label>
+              <span class="strategy-name">SmartFedProx</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkSmartFedProx" checked />
+                <span class="toggle-slider" data-on="ON" data-off="OFF"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group toggle-group">
+            <div class="toggle-label">
+              <span>WandB Real-Time Plotting</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="useWandb" checked />
+                <span class="toggle-slider" data-on="ON" data-off="OFF"></span>
+              </label>
             </div>
           </div>
 
@@ -106,12 +125,12 @@
           <div id="welcomeScreen">
             <div class="card">
               <h3>Getting Started</h3>
-              <p style="color: var(--muted); font-size: 0.9rem">
+              <p class="welcome-text">
                 Configure parameters on the left and click
-                <strong>Run Simulation</strong>. This is will start a simulation
+                <strong>Run Simulation</strong>. This will start a simulation
                 on FedAvg, FedProx and SmartFedProx or on the selected
-                stratergies in a federated setting and return per-round metrics
-                with the comparison graphs.
+                strategies in a federated setting and return per-round metrics
+                with comparison graphs.
               </p>
             </div>
             <div class="strategy-cards" id="strategyCards"></div>
@@ -166,9 +185,7 @@
                   <tbody></tbody>
                 </table>
               </div>
-              <a class="download-link" id="downloadCSV" href="#"
-                >Download CSV</a
-              >
+              <a class="download-btn" id="downloadCSV" href="#">Download CSV</a>
             </div>
           </div>
         </section>
