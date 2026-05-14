@@ -40,6 +40,13 @@ FLRegressionFlwr/
 │   ├── app.js                        # Interactive Plotly frontend
 │   └── styles.css                    # Dark-themed UI styling
 ├── outputs/                          # Generated output PNGs (gitignored)
+├── testScripts/
+│   ├── run_benchmark.py          # Centralized vs federated benchmark
+│   ├── run_ablation_norm.py      # Ablation: normalization layer comparison
+│   ├── run_ablation_split.py     # Ablation: client selection split ratios
+│   ├── ablation_components.py    # Shared components for ablation studies
+│   ├── metrics_table.py          # Per-round metrics table generator
+│   └── results/                  # Generated benchmark/ablation outputs
 ├── tests/
 │   └── test_basic.py
 ├── scripts/
@@ -177,7 +184,9 @@ Open `http://localhost:8000` in your browser.
 | `/` | GET | Web dashboard |
 | `/api/config` | GET | Server configuration |
 | `/api/simulate` | POST | Run simulation with custom parameters |
-| `/api/results/{run_id}` | GET | Fetch results for a run |
+| `/api/status` | GET | Current simulation status |
+| `/api/results` | GET | Fetch all results |
+| `/api/results/{run_id}` | GET | Fetch results for a specific run |
 | `/docs` | GET | Interactive OpenAPI docs |
 
 The `/api/simulate` endpoint accepts a `use_wandb` boolean field (default `true`) to control whether WandB is used for that run.
@@ -217,6 +226,29 @@ GitHub Actions runs on every push and pull request:
 pip install pytest pytest-cov flake8
 pytest tests/ -v
 ./scripts/run_tests.sh
+```
+
+---
+
+## Benchmark and Ablation Scripts
+
+The `testScripts/` directory contains standalone analysis scripts for deeper evaluation:
+
+| Script | Description |
+|---|---|
+| `run_benchmark.py` | Trains centralized IID and non-IID baselines alongside all three FL strategies and produces side-by-side comparison plots |
+| `run_ablation_norm.py` | Ablation study comparing BatchNorm, LayerNorm, and GroupNorm under SmartFedProx |
+| `run_ablation_split.py` | Ablation study comparing different High/Mid/Low client selection split ratios against a random control |
+| `metrics_table.py` | Generates per-round regression metrics tables (R², MSE, RMSE, MAE, Train Loss) across trials |
+
+All outputs are saved to `testScripts/results/`.
+
+```bash
+python testScripts/run_benchmark.py
+python testScripts/run_benchmark.py --epochs 35 --rounds 20 --trials 3 --seed 2023
+python testScripts/run_ablation_norm.py
+python testScripts/run_ablation_split.py
+python testScripts/metrics_table.py
 ```
 
 ---
