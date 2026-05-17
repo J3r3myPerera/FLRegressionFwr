@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
+
 from pathlib import Path
 
 # Add FLRegression to path so we can import project modules
