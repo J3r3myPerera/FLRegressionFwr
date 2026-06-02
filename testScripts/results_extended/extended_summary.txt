@@ -1,0 +1,24 @@
+========================================================================================================================
+EXTENDED COMPONENT ABLATION: ADAPTIVE CLIENT MU vs SERVER COEFFICIENT vs CLIENT SELECTION
+========================================================================================================================
+Configuration                Selection  Client Mu    Server Mu      Final R2      Std   Final MSE   Final RMSE    Best R2
+------------------------------------------------------------------------------------------------------------------------
+Baseline (FedProx)           Random     Fixed        Fixed            0.5971   0.0386      0.4598       0.6773     0.6604
+Adaptive Client Mu Only      Random     Adaptive     Fixed            0.6092   0.0288      0.4461       0.6674     0.6683
+Server Coefficient Only      Random     Fixed        Adaptive         0.7422   0.0138      0.2942       0.5422     0.7579
+Client Selection Only        Hybrid     Fixed        Fixed            0.6654   0.0166      0.3819       0.6178     0.6840
+Full SmartFedProx            Hybrid     Adaptive     Adaptive         0.7425   0.0129      0.2939       0.5420     0.7544
+------------------------------------------------------------------------------------------------------------------------
+
+CONTRIBUTION ANALYSIS (R² gain over baseline 0.5971):
+  Adaptive client mu (alone):    +0.0121
+  Server coefficient (alone):    +0.1451
+  Client selection (alone):      +0.0683
+  Interaction (synergy/cancel):  -0.0801
+  Total (Full SmartFedProx):     +0.1454
+
+  Ranking by absolute R² contribution:
+    1. Server coefficient: +0.1451
+    2. Client selection: +0.0683
+    3. Adaptive client mu: +0.0121
+========================================================================================================================
