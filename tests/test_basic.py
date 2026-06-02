@@ -17,10 +17,10 @@ from dataset import (
     load_centralized_dataset,
     reset_data_cache,
 )
-from module import Net, train, test, compute_model_divergence, compute_adaptive_mu
+from module import Net, compute_model_divergence, compute_adaptive_mu
 from client import SimulatedClient
 from server import FederatedSimulator
-from module import NUM_CLIENTS, BATCH_SIZE, DEVICE, STRATEGIES
+from module import NUM_CLIENTS, BATCH_SIZE, STRATEGIES
 
 
 class TestDataLoading:
@@ -142,7 +142,7 @@ class TestClient:
         reset_data_cache()
         client = SimulatedClient(0, NUM_CLIENTS, BATCH_SIZE)
         
-        from module import Net, get_input_dim, DEVICE
+        from module import Net, get_input_dim
         input_dim = get_input_dim()
         model = Net(input_dim=input_dim)
         model_state_dict = model.state_dict()

@@ -7,7 +7,6 @@ and a Random control, then saves results to testScripts/results/.
 
 import os
 import sys
-import time
 import numpy as np
 import torch
 import matplotlib
