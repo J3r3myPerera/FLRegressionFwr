@@ -14,6 +14,175 @@ const PLOT_LAYOUT = {
   hovermode: "x unified",
 };
 
+/* ====== PREDICTION TAB ====== */
+
+// Field definitions: [api field name, label]. Selects carry an options list.
+const PREDICT_SECTIONS = [
+  {
+    title: "Personal",
+    fields: [
+      ["Income", "Monthly Income"],
+      ["Age", "Age"],
+      ["Dependents", "Dependents"],
+      ["Occupation", "Occupation", ["Professional", "Retired", "Self_Employed", "Student"]],
+      ["City_Tier", "City Tier", ["Tier_1", "Tier_2", "Tier_3"]],
+    ],
+  },
+  {
+    title: "Monthly Expenses",
+    fields: [
+      ["Rent", "Rent"],
+      ["Loan_Repayment", "Loan Repayment"],
+      ["Insurance", "Insurance"],
+      ["Groceries", "Groceries"],
+      ["Transport", "Transport"],
+      ["Eating_Out", "Eating Out"],
+      ["Entertainment", "Entertainment"],
+      ["Utilities", "Utilities"],
+      ["Healthcare", "Healthcare"],
+      ["Education", "Education"],
+      ["Miscellaneous", "Miscellaneous"],
+    ],
+  },
+  {
+    title: "Savings Goals",
+    fields: [
+      ["Desired_Savings_Percentage", "Desired Savings %"],
+      ["Desired_Savings", "Desired Savings"],
+    ],
+  },
+  {
+    title: "Potential Savings",
+    fields: [
+      ["Potential_Savings_Groceries", "Groceries"],
+      ["Potential_Savings_Transport", "Transport"],
+      ["Potential_Savings_Eating_Out", "Eating Out"],
+      ["Potential_Savings_Entertainment", "Entertainment"],
+      ["Potential_Savings_Utilities", "Utilities"],
+      ["Potential_Savings_Healthcare", "Healthcare"],
+      ["Potential_Savings_Education", "Education"],
+      ["Potential_Savings_Miscellaneous", "Miscellaneous"],
+    ],
+  },
+];
+
+const SAMPLE_INPUT = {
+  Income: 44637, Age: 49, Dependents: 0,
+  Occupation: "Self_Employed", City_Tier: "Tier_1",
+  Rent: 13391, Loan_Repayment: 0, Insurance: 2206, Groceries: 6659,
+  Transport: 2637, Eating_Out: 1652, Entertainment: 1536, Utilities: 2912,
+  Healthcare: 1547, Education: 0, Miscellaneous: 832,
+  Desired_Savings_Percentage: 13.9, Desired_Savings: 6201,
+  Potential_Savings_Groceries: 1686, Potential_Savings_Transport: 329,
+  Potential_Savings_Eating_Out: 466, Potential_Savings_Entertainment: 195,
+  Potential_Savings_Utilities: 678, Potential_Savings_Healthcare: 68,
+  Potential_Savings_Education: 0, Potential_Savings_Miscellaneous: 86,
+};
+
+function switchTab(tab) {
+  const predict = tab === "predict";
+  document.getElementById("tabSimulate").classList.toggle("active", !predict);
+  document.getElementById("tabPredict").classList.toggle("active", predict);
+  document.getElementById("simulateScreen").classList.toggle("hidden", predict);
+  document.getElementById("predictScreen").classList.toggle("hidden", !predict);
+  if (predict) loadModels();
+}
+
+function buildPredictForm() {
+  const container = document.getElementById("predictForm");
+  container.innerHTML = PREDICT_SECTIONS.map(({ title, fields }) => {
+    const inputs = fields
+      .map(([name, label, options]) => {
+        const input = options
+          ? `<select id="pred_${name}">${options
+              .map((o) => `<option value="${o}">${o.replace(/_/g, " ")}</option>`)
+              .join("")}</select>`
+          : `<input type="number" id="pred_${name}" value="0" min="0" step="any" />`;
+        return `<div class="form-group"><label for="pred_${name}">${label}</label>${input}</div>`;
+      })
+      .join("");
+    return `<h2 class="predict-section-title">${title}</h2><div class="predict-grid">${inputs}</div>`;
+  }).join("");
+}
+
+function fillSampleData() {
+  for (const [name, value] of Object.entries(SAMPLE_INPUT)) {
+    document.getElementById(`pred_${name}`).value = value;
+  }
+}
+
+async function loadModels() {
+  const select = document.getElementById("predictModel");
+  try {
+    const resp = await fetch("/api/models");
+    const models = resp.ok ? await resp.json() : {};
+    const names = Object.keys(models);
+    if (names.length === 0) {
+      select.innerHTML = `<option value="">No trained models — run a simulation first</option>`;
+      return;
+    }
+    const previous = select.value;
+    select.innerHTML = names
+      .map((n) => `<option value="${n}">${n} (${models[n]})</option>`)
+      .join("");
+    // Keep the user's choice across refreshes; default to SmartFedProx
+    if (names.includes(previous)) select.value = previous;
+    else if (names.includes("SmartFedProx")) select.value = "SmartFedProx";
+  } catch (_) {
+    select.innerHTML = `<option value="">API not reachable</option>`;
+  }
+}
+
+async function runPrediction() {
+  const errorEl = document.getElementById("predictError");
+  const resultCard = document.getElementById("predictionResult");
+  errorEl.classList.add("hidden");
+
+  const strategy = document.getElementById("predictModel").value;
+  if (!strategy) {
+    errorEl.textContent = "No trained model available. Run a simulation first.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const payload = { strategy };
+  for (const { fields } of PREDICT_SECTIONS) {
+    for (const [name, , options] of fields) {
+      const raw = document.getElementById(`pred_${name}`).value;
+      payload[name] = options ? raw : parseFloat(raw) || 0;
+    }
+  }
+
+  const btn = document.getElementById("btnPredict");
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || "Prediction failed");
+    }
+    const data = await resp.json();
+    document.getElementById("predictionValue").textContent =
+      "₹ " + data.predicted_disposable_income.toLocaleString("en-IN");
+    document.getElementById("predictionMeta").textContent =
+      `${data.strategy} model · ${data.model_source}`;
+    resultCard.classList.remove("hidden");
+    resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    resultCard.classList.add("hidden");
+    errorEl.textContent = "Error: " + e.message;
+    errorEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+buildPredictForm();
+
 /* ON LOAD — fetch server config & populate strategy cards*/
 (async function init() {
   try {

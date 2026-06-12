@@ -187,11 +187,27 @@ Open `http://localhost:8000` in your browser.
 | `/api/status` | GET | Current simulation status |
 | `/api/results` | GET | Fetch all results |
 | `/api/results/{run_id}` | GET | Fetch results for a specific run |
+| `/api/models` | GET | List strategies with a trained model available for prediction |
+| `/api/predict` | POST | Predict disposable income for a single input using a trained model |
 | `/docs` | GET | Interactive OpenAPI docs |
 
 The `/api/simulate` endpoint accepts a `use_wandb` boolean field (default `true`) to control whether WandB is used for that run.
 
-The dashboard provides a dark-themed UI with real-time Plotly charts for R², MSE, training loss, divergence, and μ across all three strategies. Strategy selection uses toggle switches (ON/OFF), and a dedicated **WandB Real-Time Plotting** toggle lets you enable or disable WandB logging directly from the UI without restarting the server.
+The dashboard provides a dark-themed UI with two tabs:
+
+- **Simulation** — real-time Plotly charts for R², MSE, training loss, divergence, and μ across all three strategies. Strategy selection uses toggle switches (ON/OFF), and a dedicated **WandB Real-Time Plotting** toggle lets you enable or disable WandB logging directly from the UI without restarting the server.
+- **Predict** — a form for entering raw (unscaled) feature values (income, age, occupation, expenses, savings goals, etc.) and getting a disposable income prediction from any trained model. A model selector shows which strategies are available and whether the weights come from the current session or a saved checkpoint, and a **Fill Sample Data** button populates the form with an example row.
+
+### Prediction Pipeline
+
+`POST /api/predict` accepts raw feature values plus a `strategy` field (default `SmartFedProx`). The server re-applies the exact training pipeline — label-encodes `Occupation`/`City_Tier`, scales features with the fitted `StandardScaler`, runs the model in eval mode, and inverse-transforms the output back to currency units. Models trained via `/api/simulate` are saved to `FLRegression/resultOutput/{strategy}_final_model.pt` and cached in memory; if no simulation has run in the current session, the endpoint falls back to the checkpoint on disk.
+
+```bash
+curl -X POST localhost:8000/api/predict -H "Content-Type: application/json" \
+  -d '{"Income": 44637, "Age": 49, "Occupation": "Self_Employed", "City_Tier": "Tier_1", "Rent": 13391, "Groceries": 6659}'
+```
+
+Unspecified numeric fields default to `0`.
 
 ---
 

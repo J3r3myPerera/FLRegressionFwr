@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "FLRegression"))
 import module as _module
 from module import (
     NUM_ROUNDS, NUM_CLIENTS, FRACTION_FIT, LOCAL_EPOCHS,
-    LEARNING_RATE, BATCH_SIZE, DEVICE, STRATEGIES,
+    LEARNING_RATE, BATCH_SIZE, DEVICE, STRATEGIES, Net,
     get_input_dim, _load_and_preprocess_data, reset_data_cache,
 )
 from server import FederatedSimulator
@@ -40,6 +40,10 @@ from server import FederatedSimulator
 simulation_store: dict = {}          # latest results keyed by run id
 simulation_status: dict = {}         # "idle" | "running" | "done" | "error"
 current_run_id: Optional[str] = None
+model_cache: dict = {}               # strategy name -> trained Net (eval mode)
+session_trained: set = set()         # strategies trained by a simulation this session
+
+MODEL_DIR = Path(__file__).parent / "FLRegression" / "resultOutput"
 
 
 @asynccontextmanager
@@ -80,6 +84,37 @@ class SimulationRequest(BaseModel):
     learning_rate: float = Field(default=LEARNING_RATE, ge=0.00001, le=0.1)
     batch_size: int = Field(default=BATCH_SIZE, ge=8, le=512)
     use_wandb: bool = Field(default=True, description="Enable WandB real-time plotting")
+
+
+class PredictionRequest(BaseModel):
+    """Raw (unscaled) feature values for a single person/household."""
+    Income: float = Field(ge=0)
+    Age: float = Field(ge=0)
+    Dependents: float = Field(default=0, ge=0)
+    Occupation: str = Field(description="One of: Professional, Retired, Self_Employed, Student")
+    City_Tier: str = Field(description="One of: Tier_1, Tier_2, Tier_3")
+    Rent: float = Field(default=0, ge=0)
+    Loan_Repayment: float = Field(default=0, ge=0)
+    Insurance: float = Field(default=0, ge=0)
+    Groceries: float = Field(default=0, ge=0)
+    Transport: float = Field(default=0, ge=0)
+    Eating_Out: float = Field(default=0, ge=0)
+    Entertainment: float = Field(default=0, ge=0)
+    Utilities: float = Field(default=0, ge=0)
+    Healthcare: float = Field(default=0, ge=0)
+    Education: float = Field(default=0, ge=0)
+    Miscellaneous: float = Field(default=0, ge=0)
+    Desired_Savings_Percentage: float = Field(default=0, ge=0)
+    Desired_Savings: float = Field(default=0, ge=0)
+    Potential_Savings_Groceries: float = Field(default=0, ge=0)
+    Potential_Savings_Transport: float = Field(default=0, ge=0)
+    Potential_Savings_Eating_Out: float = Field(default=0, ge=0)
+    Potential_Savings_Entertainment: float = Field(default=0, ge=0)
+    Potential_Savings_Utilities: float = Field(default=0, ge=0)
+    Potential_Savings_Healthcare: float = Field(default=0, ge=0)
+    Potential_Savings_Education: float = Field(default=0, ge=0)
+    Potential_Savings_Miscellaneous: float = Field(default=0, ge=0)
+    strategy: str = Field(default="SmartFedProx", description="Which trained model to use")
 
 
 class StrategyInfo(BaseModel):
@@ -157,8 +192,18 @@ def _run_simulation_inner(req: SimulationRequest) -> dict:
                     reinit="finish_previous",
                 )
             simulator = FederatedSimulator(strategy_name, config)
-            metrics, _ = simulator.run(req.num_rounds)
+            metrics, global_state = simulator.run(req.num_rounds)
             all_trial_results[strategy_name].append(metrics)
+
+            # Persist the final global model so /api/predict can use it
+            MODEL_DIR.mkdir(parents=True, exist_ok=True)
+            torch.save(global_state, MODEL_DIR / f"{strategy_name}_final_model.pt")
+            net = Net(input_dim=get_input_dim())
+            net.load_state_dict(global_state)
+            net.eval()
+            model_cache[strategy_name] = net
+            session_trained.add(strategy_name)
+
             if req.use_wandb:
                 wandb.finish()
 
@@ -232,6 +277,62 @@ def _run_simulation_inner(req: SimulationRequest) -> dict:
         "winner": winner,
     }
 
+def _get_model(strategy: str) -> Net:
+    """Return a trained model: in-memory if a simulation ran this session,
+    otherwise loaded from the checkpoint saved by a previous run."""
+    if strategy in model_cache:
+        return model_cache[strategy]
+
+    checkpoint = MODEL_DIR / f"{strategy}_final_model.pt"
+    if not checkpoint.exists():
+        raise HTTPException(
+            404,
+            f"No trained model for '{strategy}'. Run a simulation first (POST /api/simulate).",
+        )
+    net = Net(input_dim=get_input_dim())
+    net.load_state_dict(torch.load(checkpoint, map_location="cpu"))
+    net.eval()
+    model_cache[strategy] = net
+    return net
+
+
+def _predict(req: PredictionRequest) -> dict:
+    _, preprocessors = _load_and_preprocess_data()
+    label_encoders = preprocessors["label_encoders"]
+    scaler = preprocessors["scaler"]
+    target_scaler = preprocessors["target_scaler"]
+    feature_cols = preprocessors["feature_cols"]
+
+    # Validate + encode categorical inputs with the encoders fit on the dataset
+    encoded = {}
+    for col, le in label_encoders.items():
+        value = getattr(req, col)
+        if value not in le.classes_:
+            raise HTTPException(
+                400, f"Invalid {col} '{value}'. Choose from {list(le.classes_)}"
+            )
+        encoded[col] = float(le.transform([value])[0])
+
+    # Build the feature vector in the exact training column order, then scale
+    row = [
+        encoded[col] if col in encoded else float(getattr(req, col))
+        for col in feature_cols
+    ]
+    X = scaler.transform(np.array([row], dtype=np.float32))
+
+    from_session = req.strategy in session_trained
+    net = _get_model(req.strategy)
+    with torch.no_grad():
+        y_scaled = net(torch.tensor(X, dtype=torch.float32)).numpy()
+    y = target_scaler.inverse_transform(y_scaled)
+
+    return {
+        "strategy": req.strategy,
+        "predicted_disposable_income": round(float(y[0][0]), 2),
+        "model_source": "current session" if from_session else "saved checkpoint",
+    }
+
+
 # Routes
 @app.get("/")
 async def root():
@@ -299,6 +400,26 @@ async def run_simulation(req: SimulationRequest):
     except Exception as exc:
         simulation_status[run_id] = "error"
         raise HTTPException(500, detail=str(exc))
+
+
+@app.get("/api/models")
+async def list_models():
+    """List strategies that have a trained model available for prediction."""
+    available = {
+        name: ("current session" if name in session_trained
+               else "saved checkpoint" if (MODEL_DIR / f"{name}_final_model.pt").exists()
+               else None)
+        for name in STRATEGIES
+    }
+    return {name: src for name, src in available.items() if src}
+
+
+@app.post("/api/predict")
+async def predict(req: PredictionRequest):
+    """Predict Disposable_Income for a single input using a trained federated model."""
+    if req.strategy not in STRATEGIES:
+        raise HTTPException(400, f"Unknown strategy '{req.strategy}'. Choose from {list(STRATEGIES.keys())}")
+    return _predict(req)
 
 
 @app.get("/api/results")

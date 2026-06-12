@@ -14,7 +14,61 @@
     </header>
 
     <div class="container">
-      <div class="grid-2">
+      <nav class="tab-bar">
+        <button
+          class="tab-btn active"
+          id="tabSimulate"
+          onclick="switchTab('simulate')"
+        >
+          Simulation
+        </button>
+        <button class="tab-btn" id="tabPredict" onclick="switchTab('predict')">
+          Predict
+        </button>
+      </nav>
+
+      <!-- ====== PREDICT TAB ====== -->
+      <section id="predictScreen" class="hidden">
+        <div class="card">
+          <h3>Predict Disposable Income</h3>
+          <!-- <p class="welcome-text">
+            Enter raw (unscaled) values and get a prediction from a trained
+            federated model. Models become available after a simulation has
+            been run (or from a previously saved checkpoint).
+          </p> -->
+
+          <div class="predict-toolbar">
+            <div class="form-group">
+              <label for="predictModel">Model</label>
+              <select id="predictModel"></select>
+            </div>
+            <button class="btn btn-secondary" onclick="fillSampleData()">
+              Fill Sample Data
+            </button>
+          </div>
+
+          <div id="predictForm"></div>
+
+          <div class="btn-group predict-actions">
+            <button
+              class="btn btn-primary"
+              id="btnPredict"
+              onclick="runPrediction()"
+            >
+              Predict
+            </button>
+          </div>
+          <p class="error-msg hidden" id="predictError"></p>
+        </div>
+
+        <div class="card prediction-result hidden" id="predictionResult">
+          <div class="label">Predicted Disposable Income</div>
+          <div class="value" id="predictionValue"></div>
+          <div class="meta" id="predictionMeta"></div>
+        </div>
+      </section>
+
+      <div class="grid-2" id="simulateScreen">
         <!-- ====== SIDEBAR ====== -->
         <aside class="sidebar">
           <h2>Simulation Config</h2>
@@ -127,10 +181,10 @@
               <h3>Getting Started</h3>
               <p class="welcome-text">
                 Configure parameters on the left and click
-                <strong>Run Simulation</strong>. This will start a simulation
-                on FedAvg, FedProx and SmartFedProx or on the selected
-                strategies in a federated setting and return per-round metrics
-                with comparison graphs.
+                <strong>Run Simulation</strong>. This will start a simulation on
+                FedAvg, FedProx and SmartFedProx or on the selected strategies
+                in a federated setting and return per-round metrics with
+                comparison graphs.
               </p>
             </div>
             <div class="strategy-cards" id="strategyCards"></div>
