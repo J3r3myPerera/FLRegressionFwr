@@ -142,7 +142,6 @@ class TestClient:
         reset_data_cache()
         client = SimulatedClient(0, NUM_CLIENTS, BATCH_SIZE)
         
-        from module import Net, get_input_dim
         input_dim = get_input_dim()
         model = Net(input_dim=input_dim)
         model_state_dict = model.state_dict()
@@ -167,7 +166,6 @@ class TestClient:
         reset_data_cache()
         client = SimulatedClient(0, NUM_CLIENTS, BATCH_SIZE)
         
-        from module import Net, get_input_dim
         input_dim = get_input_dim()
         model = Net(input_dim=input_dim)
         model_state_dict = model.state_dict()
@@ -203,7 +201,6 @@ class TestServer:
     def test_aggregation(self):
         """Test model aggregation."""
         reset_data_cache()
-        from module import Net, get_input_dim
         
         config = STRATEGIES["FedAvg"]
         simulator = FederatedSimulator("FedAvg", config)

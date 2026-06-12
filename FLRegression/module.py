@@ -204,8 +204,5 @@ def test(net, testloader, device):
     ss_res = ((all_targets - all_predictions) ** 2).sum().item()
     ss_tot = ((all_targets - all_targets.mean()) ** 2).sum().item()
     r2_score = 1 - (ss_res / max(ss_tot, 1e-8))
-    
-    # Calculate RMSE
-    rmse = (total_loss / max(total_samples, 1)) ** 0.5
-    
+
     return avg_loss, r2_score
