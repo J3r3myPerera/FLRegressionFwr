@@ -1,0 +1,14 @@
+name: flower
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - -r requirements.txt
+      - -e FlowerImplementation/quickstart-pytorch
+      - pytest
+      - pytest-cov
+      - flake8
+      - black
+      - isort
